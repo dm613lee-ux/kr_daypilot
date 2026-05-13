@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "generated_at": "2026-05-13T15:50:30.767249+09:00",
+    "policy_hash": "9bd8d2d80da6",
+    "candidate_scope": "all",
+    "train_days": 80,
+    "holdout_days": 20,
+    "step_days": 20,
+    "min_train_signals": 8,
+    "evaluated_candidates": 300,
+    "rule_grid_size": 1680,
+    "windows": 3,
+    "holdout_candidates": 87,
+    "holdout_signals": 8,
+    "holdout_successes": 3,
+    "holdout_failures": 3,
+    "holdout_time_exits": 2,
+    "holdout_success_rate": 37.5,
+    "holdout_candidate_success_rate": 3.45,
+    "holdout_wilson_low": 13.68,
+    "holdout_avg_net_return_pct": -0.104,
+    "required_oos_min_trades": 300,
+    "required_success_rate_pct": 62.0,
+    "required_wilson_lower_pct": 55.0,
+    "research_pass": false,
+    "research_note": "pass requires enough holdout signals, success rate, and Wilson lower bound"
+  }
+}

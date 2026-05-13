@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-05-11T11:18:31.833088+09:00",
+  "summary": {
+    "files": 196,
+    "candidates": 196,
+    "signals": 43,
+    "successes": 17,
+    "failure_exits": 18,
+    "time_exits": 8,
+    "no_signals": 153,
+    "success_rate": 39.53,
+    "candidate_success_rate": 8.67,
+    "avg_net_return_pct": -0.267
+  }
+}

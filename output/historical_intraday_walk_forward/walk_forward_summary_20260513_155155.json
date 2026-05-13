@@ -1,0 +1,19 @@
+{
+  "summary": {
+    "generated_at": "2026-05-13T15:51:55.712870+09:00",
+    "policy_hash": "9bd8d2d80da6",
+    "candidate_scope": "base-policy",
+    "evaluated_candidates": 23,
+    "windows": 0,
+    "holdout_signals": 0,
+    "holdout_successes": 0,
+    "holdout_failures": 0,
+    "holdout_time_exits": 0,
+    "holdout_success_rate": 0.0,
+    "holdout_candidate_success_rate": 0.0,
+    "holdout_wilson_low": 0.0,
+    "holdout_avg_net_return_pct": 0.0,
+    "research_pass": false,
+    "research_note": "not enough chronological data for requested walk-forward windows"
+  }
+}

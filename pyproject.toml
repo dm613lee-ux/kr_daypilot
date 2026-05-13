@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kr-daypilot"
+version = "0.1.0"
+description = "KR DayPilot short-term Korean stock screening and backtesting tools"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2,<3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+kr-daypilot-backtest = "kr_precision_backtest.run_backtest:main"
+kr-daypilot-daily-pipeline = "kr_precision_backtest.daily_pipeline:main"
+kr-daypilot-intraday-collect = "kr_precision_backtest.collect_intraday:main"
+kr-daypilot-intraday-backtest = "kr_precision_backtest.run_intraday_backtest:main"
+kr-daypilot-historical-intraday-backfill = "kr_precision_backtest.backfill_historical_intraday:main"
+kr-daypilot-historical-intraday-backtest = "kr_precision_backtest.run_historical_intraday_backtest:main"
+kr-daypilot-walk-forward-validation = "kr_precision_backtest.run_walk_forward_validation:main"
+kr-daypilot-swing-backtest = "kr_precision_backtest.run_swing_backtest:main"
+kr-daypilot-paper-plan = "kr_precision_backtest.run_paper_plan:main"
+kr-daypilot-feature-stop-analysis = "kr_precision_backtest.run_feature_stop_analysis:main"
+kr-daypilot-risk-context = "kr_precision_backtest.collect_risk_context:main"
+kr-daypilot-risk-context-validate = "kr_precision_backtest.analyze_risk_context:main"
