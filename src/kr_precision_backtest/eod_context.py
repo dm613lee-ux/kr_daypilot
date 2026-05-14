@@ -10,6 +10,7 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "institution_net_buy_value",
     "retail_net_buy_value",
     "short_sale_value_ratio",
+    "short_balance_ratio",
     "credit_balance_ratio",
 ]
 
@@ -96,7 +97,7 @@ def merge_optional_investor_flows(history: pd.DataFrame, path: Path) -> pd.DataF
 
 def merge_optional_short_credit(history: pd.DataFrame, path: Path) -> pd.DataFrame:
     df = history.copy()
-    columns = ["short_sale_value_ratio", "credit_balance_ratio"]
+    columns = ["short_sale_value_ratio", "short_balance_ratio", "credit_balance_ratio"]
     if path.exists():
         frame = read_context_csv(path)
         keep = ["source_bas_dt", "ticker"] + [col for col in columns if col in frame.columns]

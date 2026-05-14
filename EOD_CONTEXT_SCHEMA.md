@@ -35,8 +35,8 @@ source_bas_dt,ticker,foreign_net_buy_value,institution_net_buy_value,retail_net_
 공매도/신용잔고 리스크 데이터입니다.
 
 ```csv
-source_bas_dt,ticker,short_sale_value_ratio,credit_balance_ratio,source,updated_at
-20260507,005930,0.0,0.0,krx,2026-05-08T18:00:00+09:00
+source_bas_dt,ticker,short_sale_value,short_sale_total_value,short_sale_value_ratio,short_balance_value,short_balance_ratio,credit_balance_ratio,source,updated_at
+20260507,005930,0,0,0.0,0,0.0,0.0,krx,2026-05-08T18:00:00+09:00
 ```
 
 필수 컬럼:
@@ -47,7 +47,14 @@ source_bas_dt,ticker,short_sale_value_ratio,credit_balance_ratio,source,updated_
 선택 컬럼:
 
 - `short_sale_value_ratio`
+- `short_balance_ratio`
 - `credit_balance_ratio`
+
+주의:
+
+- `short_sale_value_ratio`는 공매도 거래대금 비중입니다.
+- `short_balance_ratio`는 공매도 잔고 비중입니다.
+- `credit_balance_ratio`는 신용잔고 비율 입력용 컬럼입니다. 현재 기본 수집기는 KRX/pykrx에서 제공 가능한 공매도 거래/잔고를 우선 채우며, 신용잔고 원천이 없으면 0 또는 결측으로 남깁니다.
 
 ## disclosures.csv
 

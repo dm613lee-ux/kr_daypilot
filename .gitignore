@@ -19,6 +19,8 @@ output/swing_backtest/
 output/app/
 output/risk_context/
 output/risk_context_validation/
+output/eod_context/
+output/krx_access/
 output/feature_validation/
 output/phase1_*.csv
 output/phase1_*.html

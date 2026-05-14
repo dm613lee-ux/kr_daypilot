@@ -199,6 +199,10 @@ data/eod_context/disclosures.csv
 분석 실행:
 
 ```text
+KRX접근진단_실행.bat
+KRX접근진단결과_열기.bat
+EOD컨텍스트_수집.bat
+EOD컨텍스트_결과_열기.bat
 피처손절분석_실행.bat
 피처손절분석결과_열기.bat
 ```
@@ -211,3 +215,10 @@ output/feature_validation/latest.csv
 ```
 
 손절률을 낮추는 후보 feature가 보여도 표본 300건 이상과 시간순 holdout 검증 전에는 자동 차단/가점 규칙으로 승격하지 않습니다.
+
+KRX 수급/공매도 수집은 두 접근권한을 구분해서 봅니다.
+
+- `KRX_API_KEY`: KRX Open API 일별매매정보 등 승인된 Open API 호출용입니다.
+- `KRX_ID`, `KRX_PW`: pykrx가 KRX Data Marketplace 세션을 만들 때 필요한 로그인 정보입니다. 종목별 투자자 수급/공매도 데이터는 이 세션이 없으면 수집되지 않습니다.
+
+`.env`에 로그인 정보를 추가한 뒤 `KRX접근진단_실행.bat`을 먼저 실행해 접근 가능 여부를 확인합니다. 키 값은 리포트에 출력하지 않습니다.

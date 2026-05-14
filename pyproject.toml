@@ -9,6 +9,7 @@ description = "KR DayPilot short-term Korean stock screening and backtesting too
 requires-python = ">=3.11"
 dependencies = [
   "pandas>=2.2,<3",
+  "pykrx>=1.2.8,<2",
 ]
 
 [tool.setuptools.packages.find]
@@ -25,5 +26,7 @@ kr-daypilot-walk-forward-validation = "kr_precision_backtest.run_walk_forward_va
 kr-daypilot-swing-backtest = "kr_precision_backtest.run_swing_backtest:main"
 kr-daypilot-paper-plan = "kr_precision_backtest.run_paper_plan:main"
 kr-daypilot-feature-stop-analysis = "kr_precision_backtest.run_feature_stop_analysis:main"
+kr-daypilot-eod-context = "kr_precision_backtest.collect_eod_context:main"
+kr-daypilot-krx-access = "kr_precision_backtest.diagnose_krx_access:main"
 kr-daypilot-risk-context = "kr_precision_backtest.collect_risk_context:main"
 kr-daypilot-risk-context-validate = "kr_precision_backtest.analyze_risk_context:main"

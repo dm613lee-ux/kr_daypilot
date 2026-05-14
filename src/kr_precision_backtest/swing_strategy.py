@@ -77,6 +77,7 @@ def score_swing_candidates(day_rows: pd.DataFrame, policy: Policy) -> pd.DataFra
         "institution_net_buy_value_z20",
         "retail_net_buy_value_z20",
         "short_sale_value_ratio",
+        "short_balance_ratio",
         "credit_balance_ratio",
         "disclosure_count",
     ]
@@ -205,6 +206,7 @@ def build_paper_order(candidate: dict[str, object], policy: Policy, *, rank: int
         "retail_net_buy_value_z20": round(_number(candidate.get("retail_net_buy_value_z20")), 3),
         "short_credit_available": bool(candidate.get("short_credit_available", False)),
         "short_sale_value_ratio": round(_number(candidate.get("short_sale_value_ratio")), 3),
+        "short_balance_ratio": round(_number(candidate.get("short_balance_ratio")), 3),
         "credit_balance_ratio": round(_number(candidate.get("credit_balance_ratio")), 3),
         "disclosure_count": int(_number(candidate.get("disclosure_count"))),
         "disclosure_risk_flag": bool(candidate.get("disclosure_risk_flag", False)),
@@ -545,6 +547,7 @@ def output_columns() -> list[str]:
         "retail_net_buy_value_z20",
         "short_credit_available",
         "short_sale_value_ratio",
+        "short_balance_ratio",
         "credit_balance_ratio",
         "disclosure_count",
         "disclosure_risk_flag",

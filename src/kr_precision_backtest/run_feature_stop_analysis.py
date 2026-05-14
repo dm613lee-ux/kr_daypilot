@@ -31,6 +31,7 @@ NUMERIC_FEATURES = [
     "institution_net_buy_value_z20",
     "retail_net_buy_value_z20",
     "short_sale_value_ratio",
+    "short_balance_ratio",
     "credit_balance_ratio",
     "disclosure_count",
     "entry_gap_pct",
