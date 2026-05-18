@@ -9,6 +9,7 @@ data/historical_intraday/
 data/performance/
 data/live_context/
 data/eod_context/
+data/fundamentals/
 data/reference/dart_corp_codes.csv
 output/intraday/
 output/daily_pipeline/
@@ -20,9 +21,14 @@ output/app/
 output/risk_context/
 output/risk_context_validation/
 output/eod_context/
+output/fundamentals/
 output/krx_access/
 output/feature_validation/
+output/research_gate1/
+output/research_gate2/
+output/research_gate2_sensitivity/
 output/phase1_*.csv
 output/phase1_*.html
 output/phase1_*.json
 data/kr_stock_price_history.csv
+experiments/EXP_*/

@@ -222,3 +222,64 @@ KRX 수급/공매도 수집은 두 접근권한을 구분해서 봅니다.
 - `KRX_ID`, `KRX_PW`: pykrx가 KRX Data Marketplace 세션을 만들 때 필요한 로그인 정보입니다. 종목별 투자자 수급/공매도 데이터는 이 세션이 없으면 수집되지 않습니다.
 
 `.env`에 로그인 정보를 추가한 뒤 `KRX접근진단_실행.bat`을 먼저 실행해 접근 가능 여부를 확인합니다. 키 값은 리포트에 출력하지 않습니다.
+
+## Research Gate 2 다요인 추천엔진
+
+RG2는 실전 주문이 아니라 국내주식 다요인 포트폴리오 추천 로직을 검증하는 단계입니다.
+
+검증 대상:
+
+```text
+가치 + 수익성 + 모멘텀 + 저변동성
+```
+
+공시 리스크 이벤트는 기본적으로 후보에서 차단하고, 월간 또는 주간 리밸런싱 기준으로 비용/슬리피지를 차감한 성과를 비교합니다.
+
+실행:
+
+```text
+ResearchGate2_실행.bat
+ResearchGate2_결과_열기.bat
+```
+
+출력 위치:
+
+```text
+output/research_gate2/latest.html
+experiments/registry_rg2.csv
+```
+
+재무 팩터 입력 스키마와 승격 기준은 `RESEARCH_GATE_2.md`를 확인합니다. 재무 데이터 또는 OpenDART 수익성 데이터 커버리지가 부족하면 전략은 `needs_fundamental_data` 또는 `needs_profitability_data`로 남고, `paper_only`로 승격되지 않습니다. 실전 주문 자동화는 포함하지 않습니다.
+
+### RG2 펀더멘털 수집
+
+OpenDART 재무제표와 KRX/PyKRX 밸류에이션 데이터를 RG2 입력 스키마로 수집합니다. `.env`의 키 값은 로그나 리포트에 출력하지 않습니다.
+
+```text
+펀더멘털수집_실행.bat
+펀더멘털수집결과_열기.bat
+```
+
+출력:
+
+```text
+data/fundamentals/fundamental_snapshots.csv
+data/fundamentals/krx_valuation.csv
+output/fundamentals/latest.html
+```
+
+### RG2 민감도 검증
+
+`paper_only` 후보가 나온 뒤에는 월간/주간 리밸런싱, 포트폴리오 크기, 슬리피지 조건을 바꿔도 유지되는지 확인합니다. 이 결과도 실전 주문을 열지 않고 paper-only 검토 근거로만 사용합니다.
+
+```text
+ResearchGate2_민감도검증_실행.bat
+ResearchGate2_민감도검증결과_열기.bat
+```
+
+출력:
+
+```text
+output/research_gate2_sensitivity/latest.html
+experiments/registry_rg2_sensitivity.csv
+```

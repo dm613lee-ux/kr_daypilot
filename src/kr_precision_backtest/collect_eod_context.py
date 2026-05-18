@@ -158,16 +158,19 @@ def collect_eod_context(
     skip_dart: bool,
 ) -> tuple[dict[str, Path], dict[str, Any]]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    investor_path = output_dir / "investor_flows.csv"
+    short_path = output_dir / "short_credit.csv"
+    disclosure_path = output_dir / "disclosures.csv"
     updated_at = datetime.now(tz=KST).isoformat(timespec="seconds")
     investor_status: dict[str, Any] = {"status": "skipped"}
     short_status: dict[str, Any] = {"status": "skipped"}
     disclosure_status: dict[str, Any] = {"status": "skipped"}
 
     if skip_krx:
-        investor = empty_frame(INVESTOR_COLUMNS)
-        short_credit = empty_frame(SHORT_COLUMNS)
-        investor_status = {"status": "skipped", "reason": "skip_krx"}
-        short_status = {"status": "skipped", "reason": "skip_krx"}
+        investor = read_existing_context(investor_path, INVESTOR_COLUMNS)
+        short_credit = read_existing_context(short_path, SHORT_COLUMNS)
+        investor_status = {"status": "skipped", "reason": "skip_krx", "preserved_rows": int(len(investor))}
+        short_status = {"status": "skipped", "reason": "skip_krx", "preserved_rows": int(len(short_credit))}
     elif not (env.get("KRX_ID", "").strip() and env.get("KRX_PW", "").strip()):
         investor = empty_frame(INVESTOR_COLUMNS)
         short_credit = empty_frame(SHORT_COLUMNS)
@@ -191,8 +194,8 @@ def collect_eod_context(
         )
 
     if skip_dart:
-        disclosures = empty_frame(DISCLOSURE_COLUMNS)
-        disclosure_status = {"status": "skipped", "reason": "skip_dart"}
+        disclosures = read_existing_context(disclosure_path, DISCLOSURE_COLUMNS)
+        disclosure_status = {"status": "skipped", "reason": "skip_dart", "preserved_rows": int(len(disclosures))}
     else:
         disclosures, disclosure_status = collect_disclosures(
             tickers,
@@ -204,9 +207,6 @@ def collect_eod_context(
             sleep_seconds=sleep_seconds,
         )
 
-    investor_path = output_dir / "investor_flows.csv"
-    short_path = output_dir / "short_credit.csv"
-    disclosure_path = output_dir / "disclosures.csv"
     investor.to_csv(investor_path, index=False, encoding="utf-8-sig")
     short_credit.to_csv(short_path, index=False, encoding="utf-8-sig")
     disclosures.to_csv(disclosure_path, index=False, encoding="utf-8-sig")
@@ -534,6 +534,19 @@ def empty_frame(columns: list[str]) -> pd.DataFrame:
     return pd.DataFrame(columns=columns)
 
 
+def read_existing_context(path: Path, columns: list[str]) -> pd.DataFrame:
+    if not path.exists():
+        return empty_frame(columns)
+    try:
+        frame = pd.read_csv(path, dtype={"ticker": str, "source_bas_dt": str}).fillna("")
+    except (OSError, pd.errors.EmptyDataError, UnicodeError):
+        return empty_frame(columns)
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = ""
+    return frame[columns].copy()
+
+
 def normalize_ticker(value: object) -> str:
     text = "".join(ch for ch in str(value) if ch.isdigit())
     return text.zfill(6) if text else ""
@@ -554,6 +567,117 @@ def number(value: object) -> float:
         return float(text)
     except ValueError:
         return 0.0
+
+
+def normalize_index_date(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.reset_index().copy()
+    date_col = find_column(out.columns, ["날짜", "date"])
+    if date_col:
+        out = out.rename(columns={date_col: "source_bas_dt"})
+    elif len(out.columns) > 0:
+        out = out.rename(columns={out.columns[0]: "source_bas_dt"})
+    return out
+
+
+def find_column(columns: Any, names: list[str]) -> str:
+    text_columns = [str(column) for column in columns]
+    for name in names:
+        for column in text_columns:
+            if column == name:
+                return column
+    for name in names:
+        lowered = name.lower()
+        for column in text_columns:
+            if lowered and lowered in column.lower():
+                return column
+    return ""
+
+
+def row_pick(row: pd.Series, names: list[str]) -> object:
+    for name in names:
+        if name in row.index:
+            return row.get(name)
+    match = find_column(row.index, names)
+    return row.get(match) if match else 0.0
+
+
+# Keep these clean definitions below the legacy ones so Python binds the
+# pykrx Korean-column parser to readable column names at runtime.
+def collect_investor_flows_with_pykrx(
+    tickers: list[str],
+    *,
+    start_date: str,
+    end_date: str,
+    updated_at: str,
+    sleep_seconds: float,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    stock, import_error = load_pykrx_stock()
+    if stock is None:
+        return empty_frame(INVESTOR_COLUMNS), {"status": "unavailable", "reason": import_error}
+
+    probe, probe_error = safe_pykrx_call(lambda: stock.get_market_trading_value_by_date(start_date, end_date, tickers[0]))
+    if probe_error or probe.empty:
+        return empty_frame(INVESTOR_COLUMNS), {"status": "unavailable", "reason": probe_error or "empty_probe"}
+
+    rows: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for ticker in tickers:
+        frame, error = safe_pykrx_call(lambda t=ticker: stock.get_market_trading_value_by_date(start_date, end_date, t))
+        if error:
+            errors.append(f"{ticker}: {error}")
+            continue
+        if frame.empty:
+            continue
+        normalized = normalize_index_date(frame)
+        for _, row in normalized.iterrows():
+            rows.append(
+                {
+                    "source_bas_dt": normalize_date(row.get("source_bas_dt", "")),
+                    "ticker": ticker,
+                    "foreign_net_buy_value": number(row_pick(row, ["외국인합계", "외국인"])),
+                    "institution_net_buy_value": number(row_pick(row, ["기관합계", "기관"])),
+                    "retail_net_buy_value": number(row_pick(row, ["개인"])),
+                    "source": "pykrx-krx",
+                    "updated_at": updated_at,
+                }
+            )
+        time.sleep(sleep_seconds)
+    frame = pd.DataFrame(rows, columns=INVESTOR_COLUMNS)
+    return frame, {"status": "ok" if not frame.empty else "empty", "errors": errors[:5], "error_count": len(errors)}
+
+
+def normalize_short_value_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["source_bas_dt", "short_sale_value", "short_sale_total_value", "short_sale_value_ratio"])
+    out = normalize_index_date(frame)
+    out["short_sale_value"] = out.apply(lambda row: row_pick(row, ["공매도"]), axis=1)
+    out["short_sale_total_value"] = out.apply(lambda row: row_pick(row, ["매수"]), axis=1)
+    out["short_sale_value_ratio"] = out.apply(lambda row: row_pick(row, ["비중"]), axis=1)
+    keep = ["source_bas_dt", "short_sale_value", "short_sale_total_value", "short_sale_value_ratio"]
+    return out[keep].copy()
+
+
+def normalize_short_balance_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame(columns=["source_bas_dt", "short_balance_value", "short_balance_ratio"])
+    out = normalize_index_date(frame)
+    out["short_balance_value"] = out.apply(lambda row: row_pick(row, ["공매도금액", "공매도잔고"]), axis=1)
+    out["short_balance_ratio"] = out.apply(lambda row: row_pick(row, ["비중"]), axis=1)
+    keep = ["source_bas_dt", "short_balance_value", "short_balance_ratio"]
+    return out[keep].copy()
+
+
+def classify_disclosure(title: str) -> str:
+    text = title.lower()
+    if any(term in text for term in ["유상증자", "전환사채", "신주인수권", "cb", "bw"]):
+        return "financing_risk"
+    if any(term in text for term in ["소송", "횡령", "배임", "감사의견", "거래정지", "불성실"]):
+        return "governance_risk"
+    if any(term in text for term in ["실적", "영업", "매출", "이익", "손실"]):
+        return "earnings"
+    if any(term in text for term in ["계약", "공급"]):
+        return "contract"
+    return "disclosure"
 
 
 if __name__ == "__main__":
