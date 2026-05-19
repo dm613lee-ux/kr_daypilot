@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>KR DayPilot</title>
-  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/app.css?v=20260519-fundamental-core-v1">
 </head>
 <body>
   <div class="app-shell">
@@ -21,6 +21,7 @@
       <nav class="nav">
         <a href="#overview" class="active">개요</a>
         <a href="#recommendations">추천</a>
+        <a href="#engineConsensus">엔진</a>
         <a href="#ledger">Paper</a>
         <a href="#pipeline">갱신</a>
         <a href="#data">데이터</a>
@@ -83,6 +84,10 @@
             <div>
               <h2>추천 목록</h2>
               <p id="listSubtitle">-</p>
+              <div class="engine-tabs" role="tablist" aria-label="recommendation engine">
+                <button id="tacticalEngineBtn" class="engine-tab active" type="button" data-engine="tactical">기존 엔진</button>
+                <button id="coreEngineBtn" class="engine-tab" type="button" data-engine="core">Core 엔진</button>
+              </div>
             </div>
             <div class="filters">
               <input id="searchInput" type="search" placeholder="종목, 코드, 기법">
@@ -171,6 +176,30 @@
         </aside>
       </section>
 
+      <section id="engineConsensus" class="panel consensus-panel">
+        <div class="panel-head">
+          <div>
+            <h2>엔진 합의 결과</h2>
+            <p id="consensusSubtitle">기존 엔진과 Fundamental Core 엔진 비교</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>구분</th>
+                <th>종목</th>
+                <th>기존 점수</th>
+                <th>Core 점수</th>
+                <th>기존 기법</th>
+                <th>Core 기법</th>
+              </tr>
+            </thead>
+            <tbody id="consensusRows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="ledger" class="panel ledger-panel">
         <div class="panel-head">
           <div>
@@ -188,7 +217,7 @@
                 <th>진입가</th>
                 <th>최근가</th>
                 <th>수익률</th>
-                <th>상태</th>
+                <th>상태 / 관리</th>
               </tr>
             </thead>
             <tbody id="ledgerRows"></tbody>
@@ -224,6 +253,6 @@
       </section>
     </main>
   </div>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=20260519-fundamental-core-v1"></script>
 </body>
 </html>

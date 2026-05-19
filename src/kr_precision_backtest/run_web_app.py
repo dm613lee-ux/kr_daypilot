@@ -26,6 +26,7 @@ PROGRAM_ROOT = Path(__file__).resolve().parents[2]
 WEB_ROOT = PROGRAM_ROOT / "webapp"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
+APP_BUILD_ID = "20260519-fundamental-core-v1"
 APP_STATE_DIR = Path("runtime") / "webapp"
 DECISIONS_FILE = "user_decisions.json"
 PAPER_LEDGER_FILE = "paper_ledger.csv"
@@ -122,6 +123,9 @@ class KrDayPilotHandler(SimpleHTTPRequestHandler):
         if path == "/report/latest.html":
             self.serve_fixed_file(self.program_root / "output" / "investment_recommender" / "latest.html", "text/html; charset=utf-8")
             return
+        if path == "/report/core.html":
+            self.serve_fixed_file(self.program_root / "output" / "fundamental_core" / "latest.html", "text/html; charset=utf-8")
+            return
         if path == "/":
             self.path = "/index.html"
         super().do_GET()
@@ -155,6 +159,12 @@ class KrDayPilotHandler(SimpleHTTPRequestHandler):
             except ValueError as exc:
                 self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
+        if path == "/api/ledger/remove":
+            try:
+                self.send_json(remove_paper_position(self.program_root, self.read_json_body()))
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
         self.send_error(HTTPStatus.NOT_FOUND, "Unknown API route.")
 
     def read_json_body(self) -> dict[str, object]:
@@ -177,6 +187,11 @@ class KrDayPilotHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def end_headers(self) -> None:
+        if not urlparse(self.path).path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def serve_fixed_file(self, path: Path, content_type: str) -> None:
         if not path.exists():
             self.send_error(HTTPStatus.NOT_FOUND, "File not found.")
@@ -194,23 +209,37 @@ class KrDayPilotHandler(SimpleHTTPRequestHandler):
 
 def load_dashboard_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, object]:
     recommendation_path = program_root / "output" / "investment_recommender" / "latest_summary.json"
+    core_recommendation_path = program_root / "output" / "fundamental_core" / "latest_summary.json"
     pipeline_path = program_root / "output" / "investment_recommender_pipeline" / "latest_summary.json"
     recommendation_payload = read_json_file(recommendation_path)
+    core_recommendation_payload = read_json_file(core_recommendation_path)
     pipeline_payload = read_json_file(pipeline_path)
     recommendations = normalize_recommendations(recommendation_payload.get("recommendations", []))
+    core_recommendations = normalize_recommendations(core_recommendation_payload.get("recommendations", []))
+    mark_engine(recommendations, "tactical")
+    mark_engine(core_recommendations, "core")
     user_decisions = load_user_decisions(program_root)
     paper_ledger = load_paper_ledger(program_root)
     recommendations = merge_user_state(recommendations, user_decisions, paper_ledger)
+    core_recommendations = merge_user_state(core_recommendations, user_decisions, paper_ledger)
     summary = recommendation_payload.get("summary", {})
     if not isinstance(summary, dict):
         summary = {}
+    core_summary = core_recommendation_payload.get("summary", {})
+    if not isinstance(core_summary, dict):
+        core_summary = {}
     return {
         "generated_at": datetime.now(tz=KST).isoformat(timespec="seconds"),
         "summary": summary,
+        "core_summary": core_summary,
         "config": recommendation_payload.get("config", {}),
+        "core_config": core_recommendation_payload.get("config", {}),
         "inputs": recommendation_payload.get("inputs", {}),
         "recommendations": recommendations,
+        "core_recommendations": core_recommendations,
         "technique_breakdown": technique_breakdown(recommendations),
+        "core_technique_breakdown": technique_breakdown(core_recommendations),
+        "engine_comparison": build_engine_comparison(recommendations, core_recommendations),
         "user_decisions": user_decisions,
         "paper_ledger": paper_ledger,
         "paper_portfolio_summary": summarize_paper_ledger(paper_ledger),
@@ -220,6 +249,8 @@ def load_dashboard_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, objec
         "files": {
             "latest_report_html": "/report/latest.html" if (program_root / "output" / "investment_recommender" / "latest.html").exists() else "",
             "latest_summary_json": str(recommendation_path),
+            "core_report_html": "/report/core.html" if (program_root / "output" / "fundamental_core" / "latest.html").exists() else "",
+            "core_summary_json": str(core_recommendation_path),
         },
     }
 
@@ -229,6 +260,7 @@ def health_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, object]:
     price_path = program_root / "data" / "kr_stock_price_history.csv"
     return {
         "ok": True,
+        "app_build_id": APP_BUILD_ID,
         "generated_at": datetime.now(tz=KST).isoformat(timespec="seconds"),
         "summary_exists": summary_path.exists(),
         "price_history_exists": price_path.exists(),
@@ -262,6 +294,55 @@ def normalize_recommendations(raw: object) -> list[dict[str, object]]:
         normalized["ticker"] = normalize_ticker(normalized.get("ticker"))
         recommendations.append(normalized)
     return recommendations
+
+
+def mark_engine(recommendations: list[dict[str, object]], engine: str) -> None:
+    for item in recommendations:
+        item["engine"] = engine
+
+
+def build_engine_comparison(
+    tactical_recommendations: list[dict[str, object]],
+    core_recommendations: list[dict[str, object]],
+) -> dict[str, object]:
+    tactical_by_ticker = {str(item.get("ticker") or ""): item for item in tactical_recommendations if item.get("ticker")}
+    core_by_ticker = {str(item.get("ticker") or ""): item for item in core_recommendations if item.get("ticker")}
+    rows: list[dict[str, object]] = []
+    counts = {"consensus": 0, "core_pick": 0, "tactical_watch": 0}
+    for ticker in sorted(set(tactical_by_ticker) | set(core_by_ticker)):
+        tactical = tactical_by_ticker.get(ticker, {})
+        core = core_by_ticker.get(ticker, {})
+        if tactical and core:
+            category = "consensus"
+        elif core:
+            category = "core_pick"
+        else:
+            category = "tactical_watch"
+        counts[category] += 1
+        company = str(core.get("company") or tactical.get("company") or "")
+        market = str(core.get("market") or tactical.get("market") or "")
+        tactical_score = safe_float(tactical.get("final_score"))
+        core_score = safe_float(core.get("final_score"))
+        available_scores = [score for score in [tactical_score, core_score] if score is not None]
+        combined_score = sum(available_scores) / len(available_scores) if available_scores else None
+        rows.append(
+            {
+                "ticker": ticker,
+                "company": company,
+                "market": market,
+                "category": category,
+                "combined_score": combined_score,
+                "tactical_score": tactical_score,
+                "core_score": core_score,
+                "tactical_state": tactical.get("state", ""),
+                "core_state": core.get("state", ""),
+                "tactical_technique": tactical.get("technique", ""),
+                "core_technique": core.get("technique", ""),
+            }
+        )
+    category_rank = {"consensus": 0, "core_pick": 1, "tactical_watch": 2}
+    rows.sort(key=lambda row: (category_rank.get(str(row.get("category")), 9), -(safe_float(row.get("combined_score")) or -1), str(row.get("ticker"))))
+    return {"counts": counts, "rows": rows}
 
 
 def merge_user_state(
@@ -415,11 +496,15 @@ def load_latest_recommendation_payload(program_root: Path) -> dict[str, object]:
     return read_json_file(program_root / "output" / "investment_recommender" / "latest_summary.json")
 
 
+def load_latest_core_payload(program_root: Path) -> dict[str, object]:
+    return read_json_file(program_root / "output" / "fundamental_core" / "latest_summary.json")
+
+
 def find_recommendation(program_root: Path, ticker: str) -> dict[str, object]:
-    payload = load_latest_recommendation_payload(program_root)
-    for item in normalize_recommendations(payload.get("recommendations", [])):
-        if item.get("ticker") == ticker:
-            return item
+    for payload in [load_latest_recommendation_payload(program_root), load_latest_core_payload(program_root)]:
+        for item in normalize_recommendations(payload.get("recommendations", [])):
+            if item.get("ticker") == ticker:
+                return item
     return {}
 
 
@@ -631,6 +716,33 @@ def close_paper_position(program_root: Path, body: dict[str, object]) -> dict[st
     write_ledger_rows(program_root, rows)
     ledger = load_paper_ledger(program_root)
     return {"closed": True, "paper_ledger": ledger, "paper_portfolio_summary": summarize_paper_ledger(ledger)}
+
+
+def remove_paper_position(program_root: Path, body: dict[str, object]) -> dict[str, object]:
+    ticker = normalize_ticker(body.get("ticker"))
+    entry_id = str(body.get("entry_id") or "").strip()
+    if not ticker and not entry_id:
+        raise ValueError("ticker_or_entry_id_required")
+    rows = read_ledger_rows(program_root)
+    kept_rows: list[dict[str, object]] = []
+    removed_row: dict[str, object] | None = None
+    for row in rows:
+        same_entry = entry_id and str(row.get("entry_id") or "") == entry_id
+        same_ticker = ticker and normalize_ticker(row.get("ticker")) == ticker and str(row.get("status") or "open").lower() == "open"
+        if removed_row is None and (same_entry or same_ticker):
+            removed_row = row
+            continue
+        kept_rows.append(row)
+    if removed_row is None:
+        raise ValueError("position_not_found")
+    write_ledger_rows(program_root, kept_rows)
+    ledger = load_paper_ledger(program_root)
+    return {
+        "removed": True,
+        "removed_entry": normalize_ledger_row(removed_row, load_latest_prices(program_root)),
+        "paper_ledger": ledger,
+        "paper_portfolio_summary": summarize_paper_ledger(ledger),
+    }
 
 
 def read_ledger_rows(program_root: Path) -> list[dict[str, object]]:

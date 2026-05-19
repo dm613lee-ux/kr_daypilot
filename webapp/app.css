@@ -266,6 +266,33 @@ button, input, select {
   flex-wrap: wrap;
 }
 
+.engine-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.engine-tab {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.engine-tab.active {
+  background: #111827;
+  color: #ffffff;
+}
+
 .filters input,
 .filters select,
 .pipeline-form input {
@@ -342,6 +369,41 @@ tbody tr.negative td.score-cell {
   font-weight: 800;
 }
 
+.technique-label {
+  position: relative;
+  display: inline;
+  border-bottom: 1px dotted #7c8798;
+  cursor: help;
+}
+
+.technique-label::after {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: min(320px, 72vw);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.2);
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.technique-label:hover::after,
+.technique-label:focus::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .state-chip {
   display: inline-flex;
   align-items: center;
@@ -353,6 +415,33 @@ tbody tr.negative td.score-cell {
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.comparison-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #2558d8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.comparison-chip.consensus {
+  background: #e8f7f1;
+  color: var(--green);
+}
+
+.comparison-chip.core_pick {
+  background: #fff7ed;
+  color: var(--amber);
+}
+
+.comparison-chip.tactical_watch {
+  background: #eef2ff;
+  color: var(--blue);
 }
 
 .state-chip.blocked,
@@ -409,6 +498,34 @@ tbody tr.negative td.score-cell {
   margin-left: 6px;
   background: #e8f7f1;
   color: var(--green);
+}
+
+.row-action {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.row-action:hover {
+  background: #f8fafc;
+  border-color: #b9c2d0;
+}
+
+.row-action.danger {
+  color: var(--red);
+}
+
+.ledger-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .score-ring {

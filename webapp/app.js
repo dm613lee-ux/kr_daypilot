@@ -1,13 +1,22 @@
 const state = {
   payload: null,
   recommendations: [],
+  coreRecommendations: [],
+  activeEngine: "tactical",
   filtered: [],
   selectedTicker: "",
   tickerDetail: null,
   jobPoll: null,
 };
 
-const techniqueNames = ["value", "quality", "momentum", "defensive", "flow", "liquidity"];
+const techniqueNames = ["fundamental", "value_momentum", "risk", "event_flow", "value", "quality", "momentum", "defensive", "flow", "liquidity"];
+const techniqueDescriptions = {
+  "Defensive Trend Compounder": "방어성과 추세를 함께 보는 기법입니다. 변동성이 과도하지 않고 가격 추세가 유지되며, 품질/유동성이 일정 수준 이상인 후보를 우선 검토합니다.",
+  "Event-Safe Recovery": "공시나 이벤트 리스크가 크게 차단되지 않은 회복 후보를 찾는 기법입니다. 가치 매력, 품질, 회복 모멘텀이 같이 살아 있는지를 봅니다.",
+  "Flow-Backed Re-Rating": "외국인/기관 등 수급 보조 신호와 가격 재평가 가능성을 함께 보는 기법입니다. 수급이 가격 회복을 뒷받침하는지 확인합니다.",
+  "Quality Value Momentum": "가치, 재무 품질, 모멘텀을 균형 있게 보는 다요인 랭킹 기법입니다. 싸지만 약한 종목이나 강하지만 비싼 종목을 걸러냅니다.",
+  "Fundamental Core Composite": "다요인 펀더멘털을 중심축으로 고정한 코어 엔진입니다. 가치·품질·유동성을 먼저 보고, 가치+모멘텀은 순위 보강, 저변동성+추세는 리스크 필터, 공시·수급은 확인 신호로 사용합니다.",
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
@@ -21,6 +30,8 @@ function bindEvents() {
   document.getElementById("techniqueFilter").addEventListener("change", applyFilters);
   document.getElementById("stateFilter").addEventListener("change", applyFilters);
   document.getElementById("decisionFilter").addEventListener("change", applyFilters);
+  document.getElementById("tacticalEngineBtn").addEventListener("click", () => setActiveEngine("tactical"));
+  document.getElementById("coreEngineBtn").addEventListener("click", () => setActiveEngine("core"));
   document.getElementById("watchDecisionBtn").addEventListener("click", () => saveDecision("watch"));
   document.getElementById("excludeDecisionBtn").addEventListener("click", () => saveDecision("exclude"));
   document.getElementById("memoDecisionBtn").addEventListener("click", () => saveDecision("memo"));
@@ -33,12 +44,36 @@ async function loadDashboard() {
   const payload = await fetchJson("/api/dashboard");
   state.payload = payload;
   state.recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
-  if (!state.selectedTicker && state.recommendations.length) {
-    state.selectedTicker = state.recommendations[0].ticker;
+  state.coreRecommendations = Array.isArray(payload.core_recommendations) ? payload.core_recommendations : [];
+  const currentList = activeRecommendations();
+  if (!state.selectedTicker && currentList.length) {
+    state.selectedTicker = currentList[0].ticker;
   }
   renderDashboard(payload);
   applyFilters();
   renderJob(payload.job || {});
+}
+
+function activeRecommendations() {
+  return state.activeEngine === "core" ? state.coreRecommendations : state.recommendations;
+}
+
+function activeTechniqueBreakdown() {
+  const payload = state.payload || {};
+  return state.activeEngine === "core" ? (payload.core_technique_breakdown || {}) : (payload.technique_breakdown || {});
+}
+
+function activeSummary() {
+  const payload = state.payload || {};
+  return state.activeEngine === "core" ? (payload.core_summary || {}) : (payload.summary || {});
+}
+
+function setActiveEngine(engine) {
+  state.activeEngine = engine === "core" ? "core" : "tactical";
+  state.selectedTicker = "";
+  renderEngineTabs();
+  renderTechniqueFilter(activeTechniqueBreakdown());
+  applyFilters();
 }
 
 async function fetchJson(url, options = {}) {
@@ -51,9 +86,11 @@ async function fetchJson(url, options = {}) {
 }
 
 function renderDashboard(payload) {
-  const summary = payload.summary || {};
+  const summary = activeSummary();
   const freshness = summary.data_freshness || {};
   const paper = payload.paper_portfolio_summary || {};
+  const list = activeRecommendations();
+  const breakdown = activeTechniqueBreakdown();
   const generated = payload.generated_at || "";
   document.getElementById("generatedAt").textContent = generated ? `updated ${formatDateTime(generated)}` : "updated -";
 
@@ -71,15 +108,29 @@ function renderDashboard(payload) {
   document.getElementById("paperPnlValue").textContent = `평균 ${formatPct(paper.avg_pnl_pct)}`;
   document.getElementById("blockedValue").textContent = summary.blocked ?? "-";
   document.getElementById("inputRowsValue").textContent = `universe ${summary.input_rows ?? "-"}`;
-  document.getElementById("listSubtitle").textContent = `${state.recommendations.length} candidates / ${Object.keys(payload.technique_breakdown || {}).length} techniques`;
+  document.getElementById("listSubtitle").textContent = `${engineLabel(state.activeEngine)} · ${list.length} candidates / ${Object.keys(breakdown).length} techniques`;
 
   const reportLink = document.getElementById("latestReportLink");
-  reportLink.href = (payload.files && payload.files.latest_report_html) || "/report/latest.html";
+  reportLink.href = state.activeEngine === "core"
+    ? ((payload.files && payload.files.core_report_html) || "/report/core.html")
+    : ((payload.files && payload.files.latest_report_html) || "/report/latest.html");
 
-  renderTechniqueFilter(payload.technique_breakdown || {});
+  renderEngineTabs();
+  renderTechniqueFilter(breakdown);
+  renderConsensus(payload.engine_comparison || {});
   renderLedger(payload.paper_ledger || [], payload.paper_portfolio_summary || {});
   renderPipeline(payload.pipeline || {});
   renderDataFiles(payload.data_files || {});
+}
+
+function engineLabel(engine) {
+  return engine === "core" ? "Fundamental Core" : "기존 엔진";
+}
+
+function renderEngineTabs() {
+  document.querySelectorAll(".engine-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.engine === state.activeEngine);
+  });
 }
 
 function renderTechniqueFilter(breakdown) {
@@ -90,6 +141,7 @@ function renderTechniqueFilter(breakdown) {
     const option = document.createElement("option");
     option.value = technique;
     option.textContent = `${technique} (${breakdown[technique]})`;
+    option.title = techniqueDescription(technique);
     select.appendChild(option);
   });
   select.value = current;
@@ -100,7 +152,8 @@ function applyFilters() {
   const technique = document.getElementById("techniqueFilter").value;
   const filterState = document.getElementById("stateFilter").value;
   const decision = document.getElementById("decisionFilter").value;
-  state.filtered = state.recommendations.filter((item) => {
+  const source = activeRecommendations();
+  state.filtered = source.filter((item) => {
     const haystack = `${item.ticker || ""} ${item.company || ""} ${item.technique || ""}`.toLowerCase();
     return (!search || haystack.includes(search)) &&
       (!technique || item.technique === technique) &&
@@ -108,7 +161,7 @@ function applyFilters() {
       (!decision || item.user_status === decision);
   });
   renderRecommendationRows();
-  const selected = state.filtered.find((item) => item.ticker === state.selectedTicker) || state.filtered[0] || state.recommendations[0];
+  const selected = state.filtered.find((item) => item.ticker === state.selectedTicker) || state.filtered[0] || source[0];
   renderDetail(selected);
 }
 
@@ -129,7 +182,7 @@ function renderRecommendationRows() {
     row.innerHTML = `
       <td>${escapeHtml(item.rank ?? "")}</td>
       <td><span class="ticker"><strong>${escapeHtml(item.company || "-")}</strong><span>${escapeHtml(item.ticker || "")} · ${escapeHtml(item.market || "")}</span></span></td>
-      <td>${escapeHtml(item.technique || "-")}</td>
+      <td>${techniqueBadge(item.technique)}</td>
       <td class="score-cell">${formatNumber(item.final_score)}</td>
       <td><span class="decision-chip ${escapeHtml(item.user_status || "")}">${escapeHtml(decisionLabel(item.user_status))}</span>${hasPaper ? '<span class="paper-dot">Paper</span>' : ""}</td>
       <td><span class="state-chip ${escapeHtml(item.state || "")}">${escapeHtml(item.state || "-")}</span></td>
@@ -158,7 +211,7 @@ function renderDetail(item) {
   document.getElementById("detailState").textContent = item.state || "-";
   document.getElementById("detailState").className = `state-chip ${item.state || ""}`;
   document.getElementById("detailScore").textContent = formatNumber(item.final_score);
-  document.getElementById("detailTechnique").textContent = item.technique || "-";
+  document.getElementById("detailTechnique").innerHTML = techniqueBadge(item.technique);
   document.getElementById("detailEvidence").textContent = item.evidence_summary || "-";
   document.getElementById("detailPlan").textContent = item.paper_plan || "-";
   document.getElementById("detailRisk").textContent = item.block_reason || item.disclosure_titles || "clear";
@@ -230,6 +283,21 @@ async function addPaperPosition() {
   }
 }
 
+async function removePaperPosition(entryId, ticker, company) {
+  const label = company || ticker || "선택한 포지션";
+  if (!window.confirm(`${label} paper ledger 항목을 제거할까요?`)) return;
+  try {
+    await fetchJson("/api/ledger/remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entry_id: entryId, ticker }),
+    });
+    await loadDashboard();
+  } catch (error) {
+    document.getElementById("ledgerSubtitle").textContent = String(error.message || error);
+  }
+}
+
 function setScoreArc(score) {
   const circle = document.getElementById("scoreArc");
   const circumference = 301.59;
@@ -245,7 +313,11 @@ function renderComponentBars(text) {
     const [name, value] = part.split("=").map((item) => item && item.trim());
     if (name && value) scores[name] = Number(value);
   });
-  techniqueNames.forEach((name) => {
+  const orderedNames = [
+    ...techniqueNames.filter((name) => Object.prototype.hasOwnProperty.call(scores, name)),
+    ...Object.keys(scores).filter((name) => !techniqueNames.includes(name)),
+  ];
+  orderedNames.forEach((name) => {
     const value = Number.isFinite(scores[name]) ? scores[name] : 0;
     const row = document.createElement("div");
     row.className = "bar-row";
@@ -332,6 +404,34 @@ function drawLine(ctx, points, x, y, key, color, width) {
   ctx.stroke();
 }
 
+function renderConsensus(comparison) {
+  const rows = Array.isArray(comparison.rows) ? comparison.rows : [];
+  const counts = comparison.counts || {};
+  const tbody = document.getElementById("consensusRows");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  document.getElementById("consensusSubtitle").textContent =
+    `Consensus ${counts.consensus || 0} / Core ${counts.core_pick || 0} / Tactical ${counts.tactical_watch || 0}`;
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="6">비교할 엔진 결과가 없습니다.</td>';
+    tbody.appendChild(row);
+    return;
+  }
+  rows.slice(0, 12).forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td><span class="comparison-chip ${escapeHtml(item.category || "")}">${escapeHtml(comparisonLabel(item.category))}</span></td>
+      <td><span class="ticker"><strong>${escapeHtml(item.company || item.ticker || "-")}</strong><span>${escapeHtml(item.ticker || "")} · ${escapeHtml(item.market || "")}</span></span></td>
+      <td class="score-cell">${formatNumber(item.tactical_score)}</td>
+      <td class="score-cell">${formatNumber(item.core_score)}</td>
+      <td>${escapeHtml(item.tactical_technique || "-")}</td>
+      <td>${escapeHtml(item.core_technique || "-")}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
 function renderLedger(ledger, summary) {
   const tbody = document.getElementById("ledgerRows");
   tbody.innerHTML = "";
@@ -349,15 +449,27 @@ function renderLedger(ledger, summary) {
     if (Number.isFinite(pnl)) row.classList.add(pnl >= 0 ? "positive" : "negative");
     row.innerHTML = `
       <td><span class="ticker"><strong>${escapeHtml(item.company || item.ticker || "-")}</strong><span>${escapeHtml(item.ticker || "")}</span></span></td>
-      <td>${escapeHtml(item.technique || "-")}</td>
+      <td>${techniqueBadge(item.technique)}</td>
       <td>${formatDay(item.entry_date)}</td>
       <td>${formatCurrency(item.entry_price)}</td>
       <td>${formatCurrency(item.latest_close)}</td>
       <td class="score-cell">${formatPct(item.pnl_pct)}</td>
-      <td><span class="state-chip ${escapeHtml(item.status || "")}">${escapeHtml(item.status || "-")}</span></td>
+      <td><span class="ledger-status-cell"><span class="state-chip ${escapeHtml(item.status || "")}">${escapeHtml(item.status || "-")}</span><button class="row-action danger" type="button" data-entry-id="${escapeHtml(item.entry_id || "")}" data-ticker="${escapeHtml(item.ticker || "")}" data-company="${escapeHtml(item.company || "")}">제거</button></span></td>
     `;
+    const removeButton = row.querySelector(".row-action.danger");
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removePaperPosition(removeButton.dataset.entryId || "", removeButton.dataset.ticker || "", removeButton.dataset.company || "");
+    });
     tbody.appendChild(row);
   });
+}
+
+function comparisonLabel(value) {
+  if (value === "consensus") return "합의";
+  if (value === "core_pick") return "Core";
+  if (value === "tactical_watch") return "기존";
+  return "-";
 }
 
 function renderPipeline(pipeline) {
@@ -439,6 +551,16 @@ function renderJob(job) {
         : "대기 중";
   const lines = Array.isArray(job.lines) ? job.lines : [];
   document.getElementById("jobLog").textContent = lines.slice(-80).join("\n");
+}
+
+function techniqueDescription(technique) {
+  return techniqueDescriptions[technique] || "투자기법 설명이 아직 등록되지 않았습니다. 점수 구성과 근거 문장을 함께 확인하세요.";
+}
+
+function techniqueBadge(technique) {
+  const name = technique || "-";
+  const description = techniqueDescription(name);
+  return `<span class="technique-label" tabindex="0" title="${escapeHtml(description)}" data-tooltip="${escapeHtml(description)}">${escapeHtml(name)}</span>`;
 }
 
 function decisionLabel(value) {

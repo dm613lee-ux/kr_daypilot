@@ -58,12 +58,13 @@ class RecommenderPipelineTest(unittest.TestCase):
 
         steps = build_pipeline_steps(config, python_executable="python")
 
-        self.assertEqual([step.name for step in steps], ["price_refresh", "eod_context", "fundamentals", "investment_recommender"])
+        self.assertEqual([step.name for step in steps], ["price_refresh", "eod_context", "fundamentals", "investment_recommender", "fundamental_core"])
         self.assertIn("kr_precision_backtest.collect_price_history", steps[0].command)
         self.assertIn("--source", steps[0].command)
         self.assertIn("pykrx-bulk", steps[0].command)
         self.assertIn("--run-date", steps[-1].command)
         self.assertIn("20260519", steps[-1].command)
+        self.assertIn("kr_precision_backtest.run_fundamental_core", steps[-1].command)
         self.assertTrue(steps[0].required)
         self.assertFalse(steps[1].required)
         self.assertFalse(steps[2].required)

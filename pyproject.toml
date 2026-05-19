@@ -24,3 +24,4 @@ kr-daypilot-recommender-pipeline = "kr_precision_backtest.run_recommender_pipeli
 kr-daypilot-web = "kr_precision_backtest.run_web_app:main"
 kr-daypilot-web-launch = "kr_precision_backtest.launch_web_app:main"
 kr-daypilot-investment-recommender = "kr_precision_backtest.run_investment_recommender:main"
+kr-daypilot-fundamental-core = "kr_precision_backtest.run_fundamental_core:main"

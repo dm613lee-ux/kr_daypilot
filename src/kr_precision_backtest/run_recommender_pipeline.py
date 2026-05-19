@@ -181,6 +181,18 @@ def build_pipeline_steps(config: PipelineConfig, *, python_executable: str) -> l
     if config.allow_stale_data:
         recommender_command.append("--allow-stale-data")
     steps.append(PipelineStep("investment_recommender", recommender_command, True))
+    core_command = [
+        python_executable,
+        "-m",
+        "kr_precision_backtest.run_fundamental_core",
+        "--run-date",
+        config.run_date,
+        "--top",
+        str(config.recommendation_top),
+    ]
+    if config.allow_stale_data:
+        core_command.append("--allow-stale-data")
+    steps.append(PipelineStep("fundamental_core", core_command, True))
     return steps
 
 
