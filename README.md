@@ -1,375 +1,59 @@
 # KR DayPilot
 
-`KR DayPilot`은 기존 국내주식 앱과 분리된 별도 프로젝트입니다.
+국내 주식 투자 후보를 선별하고, 사용자 판단과 paper portfolio 성과를 추적하는 로컬 웹앱입니다.
 
-목표는 직장인이 장중 계속 매매 화면을 보지 않아도 사용할 수 있는 단기 국내주식 추천·조건부 주문 앱을 단계적으로 검증하는 것입니다.
-
-## 프로젝트 경계
-
-- 기존 국내주식 앱 폴더의 코드는 참고할 수 있습니다.
-- `KR DayPilot` 실행은 기존 국내주식 앱 폴더의 파일을 직접 읽지 않습니다.
-- 가격 데이터는 `data/` 폴더 안의 독립 복사본을 사용합니다.
-- API 키는 `KR DayPilot/.env`에 별도 복사본으로 보관합니다.
-- 기존 국내주식 앱을 변경하거나 삭제해도 `KR DayPilot`이 깨지지 않는 구조를 목표로 합니다.
-
-## 현재 단계
-
-Phase 1은 KRX 일봉 데이터 기반 proxy 백테스트입니다.
-
-현재 구현은 아래 파일을 읽습니다.
-
-```text
-data/kr_stock_price_history.csv
-config/policy.defaults.json
-```
-
-결과는 아래 폴더에 생성됩니다.
-
-```text
-output/
-```
+이 프로젝트의 현재 운영본은 실전 주문을 수행하지 않습니다. 추천 결과는 매수 확정 신호가 아니라 `paper_review` 기반의 투자 검토 자료입니다.
 
 ## 실행
 
-처음 실행 전, 현재 PC의 기본 Python에 pandas가 없으면 먼저 실행합니다.
-
-```text
-환경_설치.bat
-```
-
-검증 실행:
-
-```text
-검증_실행.bat
-```
-
-결과 확인:
-
-```text
-결과_열기.bat
-```
-
-## Phase 1B 분봉 검증
-
-KIS 당일 1분봉 데이터를 수집합니다.
-
-```text
-분봉수집_실행.bat
-```
-
-수집된 분봉으로 `09:30~10:30` 구간의 VWAP 재탈환 전략을 검증합니다.
-
-```text
-분봉검증_실행.bat
-```
-
-분봉 검증 결과를 엽니다.
-
-```text
-분봉결과_열기.bat
-```
-
-## Phase 1C 일일 누적 파이프라인
-
-아래 실행 파일은 `일봉 proxy 검증 -> 최신 기준일 후보 추출 -> KIS 분봉 수집 -> 분봉 검증 -> 일일 리포트 생성`을 한 번에 수행합니다.
-
-```text
-일일수집검증_실행.bat
-```
-
-결과 확인:
-
-```text
-일일결과_열기.bat
-```
-
-매일 장 종료 후 자동으로 누적 수집하려면 Windows 예약 작업 설치 파일을 실행합니다.
-
-```text
-예약작업_설치.bat
-```
-
-예약 작업을 제거하려면:
-
-```text
-예약작업_삭제.bat
-```
-
-예약 기본 시각은 매일 `15:45`입니다. KIS 당일분봉 API가 당일 데이터만 제공하므로, 장 종료 후 같은 날 실행해야 데이터가 누적됩니다.
-
-주의:
-
-- KIS 공식 샘플 기준 `주식당일분봉조회`는 당일 분봉만 제공합니다.
-- 과거 여러 날 검증은 이 배치 파일을 장중/장후에 반복 실행해 `data/intraday/minute_bars/`에 데이터를 누적해야 가능합니다.
-- `.env`의 API 키 값은 출력하지 않습니다.
-
-## 기본 검증 정책
-
-- 목표수익률: +1.8%
-- 손절률: -0.9%
-- 백테스트 비용: 왕복 0.60%
-- 하루 최대 후보: 2개
-- 20일 평균 거래대금: 100억 원 이상
-- 일봉 proxy 기준: close location, 거래대금 증가, 하단 회복, 시장 레짐
-
-## 중요한 한계
-
-이 Phase 1은 일봉 OHLCV 기반 proxy입니다. 아직 아래 정보는 실제로 재현하지 않습니다.
-
-- 1분봉 VWAP
-- 09:30 기준 거래대금
-- 실시간 호가 스프레드
-- 장중 뉴스/공시
-- 실제 KIS 주문 체결/부분체결
-
-따라서 이 결과는 실전 매매 가능성을 판단하는 1차 검증이지, 자동 주문 허가 기준이 아닙니다.
-
-## Phase 2A/2B 누적 성과 대시보드
-
-일일 파이프라인을 실행하면 종목·날짜별 검증 결과가 아래 파일에 누적됩니다.
-
-```text
-data/performance/trade_log.csv
-```
-
-누적 성과는 아래 HTML에서 확인합니다.
-
-```text
-output/dashboard/latest.html
-```
-
-초보자용 실행 파일:
-
-```text
-성과대시보드_열기.bat
-```
-
-대시보드는 `자동 파이프라인 추천 후보`만 기본 성과에 포함합니다. 수동으로 수집한 분봉 파일은 별도 행으로 보관되지만 추천 성공률 계산에는 포함하지 않습니다.
-
-브라우저 렌더링 검증:
-
-```text
-브라우저검증_실행.bat
-```
-
-이 검증은 기본 Python에 설치된 Playwright와 Playwright Chromium을 사용합니다. 대시보드 HTML 렌더링, 핵심 문구, 카드/표 수, 인코딩, 스크린샷 생성을 확인합니다.
-
-## Swing Paper Plan
-
-새 전략 레이어는 실전 주문이 아니라 `1~3일 스윙 + 페이퍼 우선` 검증용입니다.
-
-스윙 백테스트:
-
-```text
-스윙검증_실행.bat
-스윙검증결과_열기.bat
-```
-
-오늘의 페이퍼 주문 플랜:
-
-```text
-페이퍼플랜_실행.bat
-페이퍼플랜_열기.bat
-```
-
-출력 위치:
-
-```text
-output/swing_backtest/latest.html
-output/app/latest.html
-```
-
-판정 기준은 목표가 도달률만 보지 않고 체결률, 손절률, 시간청산, 비용 차감 순수익률, Wilson 하한을 함께 봅니다. 현재 단계는 연구/페이퍼 검증이며 자동 실전 주문은 포함하지 않습니다.
-
-## EOD Feature Stop Analysis
-
-다음 단계는 새 스윙 백테스트 결과 위에 EOD 수급, 공시, 시장국면, 섹터 컨텍스트를 붙이고 어떤 feature가 손절률을 실제로 낮추는지 검증하는 단계입니다.
-
-현재 구현은 안전하게 observe-only입니다. 즉, 수급/공시/섹터 feature를 바로 매수 추천 차단 규칙으로 쓰지 않고, 백테스트 결과 CSV에 붙인 뒤 feature 구간별 손절률·목표도달률·표본 수를 비교합니다.
-
-입력 스키마:
-
-```text
-EOD_CONTEXT_SCHEMA.md
-data/eod_context/investor_flows.csv
-data/eod_context/short_credit.csv
-data/eod_context/disclosures.csv
-```
-
-분석 실행:
-
-```text
-KRX접근진단_실행.bat
-KRX접근진단결과_열기.bat
-EOD컨텍스트_수집.bat
-EOD컨텍스트_결과_열기.bat
-피처손절분석_실행.bat
-피처손절분석결과_열기.bat
-```
-
-출력 위치:
-
-```text
-output/feature_validation/latest.html
-output/feature_validation/latest.csv
-```
-
-손절률을 낮추는 후보 feature가 보여도 표본 300건 이상과 시간순 holdout 검증 전에는 자동 차단/가점 규칙으로 승격하지 않습니다.
-
-KRX 수급/공매도 수집은 두 접근권한을 구분해서 봅니다.
-
-- `KRX_API_KEY`: KRX Open API 일별매매정보 등 승인된 Open API 호출용입니다.
-- `KRX_ID`, `KRX_PW`: pykrx가 KRX Data Marketplace 세션을 만들 때 필요한 로그인 정보입니다. 종목별 투자자 수급/공매도 데이터는 이 세션이 없으면 수집되지 않습니다.
-
-`.env`에 로그인 정보를 추가한 뒤 `KRX접근진단_실행.bat`을 먼저 실행해 접근 가능 여부를 확인합니다. 키 값은 리포트에 출력하지 않습니다.
-
-## Research Gate 2 다요인 추천엔진
-
-RG2는 실전 주문이 아니라 국내주식 다요인 포트폴리오 추천 로직을 검증하는 단계입니다.
-
-검증 대상:
-
-```text
-가치 + 수익성 + 모멘텀 + 저변동성
-```
-
-공시 리스크 이벤트는 기본적으로 후보에서 차단하고, 월간 또는 주간 리밸런싱 기준으로 비용/슬리피지를 차감한 성과를 비교합니다.
-
-실행:
-
-```text
-ResearchGate2_실행.bat
-ResearchGate2_결과_열기.bat
-```
-
-출력 위치:
-
-```text
-output/research_gate2/latest.html
-experiments/registry_rg2.csv
-```
-
-재무 팩터 입력 스키마와 승격 기준은 `RESEARCH_GATE_2.md`를 확인합니다. 재무 데이터 또는 OpenDART 수익성 데이터 커버리지가 부족하면 전략은 `needs_fundamental_data` 또는 `needs_profitability_data`로 남고, `paper_only`로 승격되지 않습니다. 실전 주문 자동화는 포함하지 않습니다.
-
-### RG2 펀더멘털 수집
-
-OpenDART 재무제표와 KRX/PyKRX 밸류에이션 데이터를 RG2 입력 스키마로 수집합니다. `.env`의 키 값은 로그나 리포트에 출력하지 않습니다.
-
-```text
-펀더멘털수집_실행.bat
-펀더멘털수집결과_열기.bat
-```
-
-출력:
-
-```text
-data/fundamentals/fundamental_snapshots.csv
-data/fundamentals/krx_valuation.csv
-output/fundamentals/latest.html
-```
-
-### RG2 민감도 검증
-
-`paper_only` 후보가 나온 뒤에는 월간/주간 리밸런싱, 포트폴리오 크기, 슬리피지 조건을 바꿔도 유지되는지 확인합니다. 이 결과도 실전 주문을 열지 않고 paper-only 검토 근거로만 사용합니다.
-
-```text
-ResearchGate2_민감도검증_실행.bat
-ResearchGate2_민감도검증결과_열기.bat
-```
-
-출력:
-
-```text
-output/research_gate2_sensitivity/latest.html
-experiments/registry_rg2_sensitivity.csv
-```
-
-## 보고서 Top 1 기반 가치/퀄리티 + 모멘텀 MVP
-
-첨부 PDF의 `프로그램 개발 후보 Top 5` 중 1순위인 `가치/퀄리티 + 모멘텀 멀티팩터 포트폴리오 봇`을 별도 MVP로 구현했습니다. 기존 RG2처럼 넓은 팩터 조합을 한 번에 시험하지 않고, 보고서 결론의 1차 MVP에 맞춰 `PER/PBR/ROE + 6~12개월 시장 대비 상대 모멘텀`만 검증합니다.
-
-실행:
-
-```text
-가치모멘텀MVP_실행.bat
-가치모멘텀MVP_결과_열기.bat
-```
-
-출력:
-
-```text
-output/value_momentum_mvp/latest.html
-output/value_momentum_mvp/latest_recommendations.csv
-experiments/registry_value_momentum_mvp.csv
-```
-
-자세한 기준은 `VALUE_MOMENTUM_MVP.md`를 확인합니다. 이 MVP도 실전 주문을 넣지 않으며 최대 상태는 `paper_only`입니다.
-
-## 투자근거 기반 종목 추천기
-
-기존 Research Gate 검증 흐름과 분리한 일일 종목 추천 프로그램입니다. 단순 팩터 조합이 아니라 투자기법별 근거를 따로 점수화합니다.
-
-웹앱 실행:
+파일 탐색기에서 아래 파일을 실행합니다.
 
 ```text
 KR_DayPilot_웹앱_실행.bat
 ```
 
-브라우저 주소:
+실행기는 서버를 시작하고 `/api/health` 상태 점검 후 브라우저를 엽니다. 기본 포트가 사용 중이면 다음 포트로 자동 회피합니다.
 
-```text
-http://127.0.0.1:8765/
+직접 실행:
+
+```powershell
+python -m kr_precision_backtest.launch_web_app
 ```
 
-투자기법:
+## 사용 흐름
+
+1. 상단 상태가 `paper_review`이고 데이터가 `fresh`인지 확인합니다.
+2. `추천` 목록에서 점수와 투자기법을 보고 후보를 선택합니다.
+3. 오른쪽 상세 패널에서 근거, 점수 구성, 진입/목표/손절 계획을 확인합니다.
+4. 후보별로 `관심 저장`, `제외`, `메모 저장`을 남깁니다.
+5. 실제 매수 전에는 `Paper 추가`로 paper portfolio ledger에 먼저 기록합니다.
+6. 이후 데이터 갱신 후 paper ledger에서 성과를 추적합니다.
+
+## 현재 운영 구성
 
 ```text
-Quality Value Momentum
-Defensive Trend Compounder
-Flow-Backed Re-Rating
-Event-Safe Recovery
+webapp/                                  정적 웹 UI
+src/kr_precision_backtest/run_web_app.py 서버 API
+src/kr_precision_backtest/launch_web_app.py 실행기
+src/kr_precision_backtest/run_recommender_pipeline.py 데이터 갱신 + 추천 파이프라인
+src/kr_precision_backtest/investment_recommender.py 투자근거 추천 엔진
+runtime/webapp/                          사용자 판단, 메모, paper ledger
+data/kr_stock_price_history.csv          가격 히스토리
+data/eod_context/                        수급/공시 컨텍스트
+data/fundamentals/                       재무/밸류에이션 데이터
+output/investment_recommender/           최신 추천 결과
 ```
 
-실행:
+## 주요 명령
 
-```text
-가격데이터갱신_실행.bat
-투자근거추천_실행.bat
-투자근거추천_결과_열기.bat
-```
-
-`투자근거추천_실행.bat`은 가격 데이터 갱신, EOD 수급/공시 컨텍스트 갱신, 펀더멘털/밸류에이션 갱신, 추천기 실행을 순서대로 수행합니다.
-
-CLI:
-
-```text
+```powershell
 python -m kr_precision_backtest.run_recommender_pipeline --price-source auto --price-max-tickers 200 --eod-max-tickers 30 --fundamental-max-tickers 30 --top 15
-python -m kr_precision_backtest.collect_price_history --source auto --max-tickers 300
 python -m kr_precision_backtest.run_investment_recommender --top 15
-python -m kr_precision_backtest.run_investment_recommender --run-date 20260519 --max-price-age-days 7
+python -m kr_precision_backtest.collect_price_history --source auto --max-tickers 200
 ```
 
-출력:
+## 정리 정책
 
-```text
-output/investment_recommender/latest.html
-output/investment_recommender/latest.csv
-output/investment_recommender/latest_summary.json
-```
+과거 실험, 기각된 검증 앱, ResearchGate, 분봉/스윙/가치모멘텀 MVP 산출물은 운영본에서 제외했습니다. 삭제하지 않고 `_archive/` 아래로 이동해 필요하면 되돌릴 수 있게 보존합니다.
 
-## 웹앱 완성본 실행
-
-`KR_DayPilot_웹앱_실행.bat` 하나로 서버 실행, 상태 점검, 브라우저 오픈을 처리합니다.
-
-웹앱에서 지원하는 의사결정 흐름:
-
-- 추천 후보별 관심 저장, 제외, 메모
-- 추천 후보를 paper portfolio ledger에 추가
-- paper 포지션의 최근가 기준 손익률 추적
-- 종목별 가격 히스토리 차트와 상세 근거 확인
-
-사용자 판단과 paper ledger는 `runtime/webapp/` 아래에 로컬 상태로 저장됩니다.
-
-로컬 가격 데이터가 실행일 기준 7일보다 오래되면 기본 상태는 `stale_data`가 되고 추천 후보는 비워집니다. 과거 데이터 점검 목적이면 `--allow-stale-data`를 붙여 별도 출력 폴더에 저장합니다.
-
-외부 오픈소스 반영 상태는 `docs/OPEN_SOURCE_INTEGRATION_STATUS.md`, 자세한 추천기 설계는 `docs/INVESTMENT_RECOMMENDER_SPEC.md`를 확인합니다. 이 추천기는 실전 주문을 넣지 않으며 최대 상태는 `paper_review`입니다.
+현재 루트에는 운영에 필요한 파일만 남기는 것을 원칙으로 합니다.

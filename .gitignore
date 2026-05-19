@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 runtime/
+_archive/
 data/intraday/
 data/historical_intraday/
 data/performance/

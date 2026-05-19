@@ -5,6 +5,7 @@ import unittest
 import pandas as pd
 
 from kr_precision_backtest.collect_price_history import (
+    collect_external_price_rows,
     merge_price_history,
     normalize_fdr_ohlcv,
     normalize_pykrx_ohlcv,
@@ -161,6 +162,19 @@ class CollectPriceHistoryTest(unittest.TestCase):
         tickers = resolve_tickers("", universe, history, max_tickers=2)
 
         self.assertEqual(tickers, ["005930", "000660"])
+
+    def test_collect_external_price_rows_skips_inverted_date_window(self) -> None:
+        rows, statuses = collect_external_price_rows(
+            ["005930"],
+            start="20260520",
+            end="20260519",
+            source="auto",
+            metadata={},
+        )
+
+        self.assertTrue(rows.empty)
+        self.assertEqual(statuses[0]["status"], "up_to_date")
+        self.assertIn("20260520", statuses[0]["message"])
 
 
 if __name__ == "__main__":

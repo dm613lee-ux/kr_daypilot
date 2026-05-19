@@ -29,6 +29,20 @@ class RecommenderPipelineTest(unittest.TestCase):
         self.assertEqual(window["to_date"], "20260519")
         self.assertEqual(window["run_date"], "20260519")
 
+    def test_resolve_pipeline_window_does_not_return_inverted_dates_when_history_is_current(self) -> None:
+        history = pd.DataFrame(
+            [
+                {"ticker": "005930", "source_bas_dt": "20260519"},
+                {"ticker": "000660", "source_bas_dt": "20260518"},
+            ]
+        )
+
+        window = resolve_pipeline_window(history, from_date="", to_date="", run_date="20260519")
+
+        self.assertEqual(window["from_date"], "20260519")
+        self.assertEqual(window["to_date"], "20260519")
+        self.assertEqual(window["run_date"], "20260519")
+
     def test_build_pipeline_steps_orders_refreshes_before_recommender(self) -> None:
         config = PipelineConfig(
             program_root=Path("X:/kr_daypilot"),

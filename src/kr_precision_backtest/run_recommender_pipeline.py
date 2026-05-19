@@ -97,7 +97,11 @@ def resolve_pipeline_window(
         latest = latest_history_day(history)
         if latest:
             latest_ts = pd.to_datetime(latest, format="%Y%m%d", errors="coerce")
-            normalized_from_date = (latest_ts + pd.Timedelta(days=1)).strftime("%Y%m%d") if not pd.isna(latest_ts) else normalized_to_date
+            to_ts = pd.to_datetime(normalized_to_date, format="%Y%m%d", errors="coerce")
+            if not pd.isna(latest_ts) and not pd.isna(to_ts) and latest_ts >= to_ts:
+                normalized_from_date = normalized_to_date
+            else:
+                normalized_from_date = (latest_ts + pd.Timedelta(days=1)).strftime("%Y%m%d") if not pd.isna(latest_ts) else normalized_to_date
         else:
             normalized_from_date = normalized_to_date
     return {

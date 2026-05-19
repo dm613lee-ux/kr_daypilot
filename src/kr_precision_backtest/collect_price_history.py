@@ -93,6 +93,14 @@ def collect_external_price_rows(
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
     if not tickers:
         return pd.DataFrame(columns=PRICE_COLUMNS), []
+    if is_inverted_date_window(start, end):
+        return pd.DataFrame(columns=PRICE_COLUMNS), [
+            {
+                "source": source,
+                "status": "up_to_date",
+                "message": f"date window has no new trading days: {start} -> {end}",
+            }
+        ]
     if source in {"auto", "pykrx-bulk"}:
         bulk_rows, bulk_status = collect_pykrx_bulk(tickers, start=start, end=end, metadata=metadata)
         if not bulk_rows.empty or source == "pykrx-bulk":
@@ -114,6 +122,12 @@ def collect_external_price_rows(
     if not all_rows:
         return pd.DataFrame(columns=PRICE_COLUMNS), statuses
     return pd.concat(all_rows, ignore_index=True)[PRICE_COLUMNS], statuses
+
+
+def is_inverted_date_window(start: str, end: str) -> bool:
+    start_ts = pd.to_datetime(normalize_date(start), format="%Y%m%d", errors="coerce")
+    end_ts = pd.to_datetime(normalize_date(end), format="%Y%m%d", errors="coerce")
+    return not pd.isna(start_ts) and not pd.isna(end_ts) and start_ts > end_ts
 
 
 def collect_pykrx_bulk(

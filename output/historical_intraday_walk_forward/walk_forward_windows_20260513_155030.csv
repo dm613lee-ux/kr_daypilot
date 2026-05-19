@@ -1,4 +1,0 @@
-﻿window,train_start,train_end,holdout_start,holdout_end,chosen_rule,train_candidates,train_signals,train_successes,train_failure_exits,train_time_exits,train_no_signals,train_success_rate,train_candidate_success_rate,train_wilson_low,train_avg_net_return_pct,holdout_candidates,holdout_signals,holdout_successes,holdout_failure_exits,holdout_time_exits,holdout_no_signals,holdout_success_rate,holdout_candidate_success_rate,holdout_wilson_low,holdout_avg_net_return_pct
-1,2025-09-08,2026-01-09,2026-01-12,2026-02-09,base,160,11,4,5,2,149,36.36,2.5,15.17,-0.267,40,4,0,2,2,36,0.0,0.0,0.0,-0.733
-2,2025-10-14,2026-02-09,2026-02-10,2026-03-18,close_location>=80,123,8,3,3,2,115,37.5,2.44,13.68,-0.104,24,3,3,0,0,21,100.0,12.5,43.85,1.2
-3,2025-11-11,2026-03-18,2026-03-19,2026-04-21,close_location>=80,115,8,5,1,2,107,62.5,4.35,30.57,0.571,23,1,0,1,0,22,0.0,0.0,0.0,-1.5
