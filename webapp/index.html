@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KR DayPilot</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M6 23.5 13.2 10l5.7 8.4L24.7 6 27 7.1l-7.6 18.1-5.7-8.5-5.5 10.1z" fill="currentColor"/>
+        </svg>
+        <div>
+          <strong>KR DayPilot</strong>
+          <span>paper review</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#overview" class="active">개요</a>
+        <a href="#recommendations">추천</a>
+        <a href="#ledger">Paper</a>
+        <a href="#pipeline">갱신</a>
+        <a href="#data">데이터</a>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="risk-dot"></span>
+        <p>실전 주문 비활성화</p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>투자근거 추천 대시보드</h1>
+          <p id="generatedAt">불러오는 중</p>
+        </div>
+        <div class="actions">
+          <button id="refreshViewBtn" class="icon-button" type="button" title="화면 새로고침">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.68V3h-5.68l2.04 2.04A9.7 9.7 0 1 0 21.7 12z"/></svg>
+          </button>
+          <a id="latestReportLink" class="secondary-action" href="/report/latest.html" target="_blank" rel="noreferrer">HTML 리포트</a>
+          <button id="runPipelineBtn" class="primary-action" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            데이터 갱신
+          </button>
+        </div>
+      </header>
+
+      <section id="overview" class="status-grid" aria-label="추천 상태">
+        <article class="metric-panel state-panel">
+          <span>상태</span>
+          <strong id="stateValue">-</strong>
+          <small id="freshnessValue">-</small>
+        </article>
+        <article class="metric-panel">
+          <span>추천 후보</span>
+          <strong id="recommendedValue">-</strong>
+          <small id="paperReviewValue">paper review -</small>
+        </article>
+        <article class="metric-panel">
+          <span>기준일</span>
+          <strong id="signalDayValue">-</strong>
+          <small id="runDateValue">run -</small>
+        </article>
+        <article class="metric-panel">
+          <span>Paper 포트폴리오</span>
+          <strong id="paperPositionsValue">-</strong>
+          <small id="paperPnlValue">수익률 -</small>
+        </article>
+        <article class="metric-panel">
+          <span>차단</span>
+          <strong id="blockedValue">-</strong>
+          <small id="inputRowsValue">universe -</small>
+        </article>
+      </section>
+
+      <section class="main-grid">
+        <section id="recommendations" class="panel recommendations-panel">
+          <div class="panel-head">
+            <div>
+              <h2>추천 목록</h2>
+              <p id="listSubtitle">-</p>
+            </div>
+            <div class="filters">
+              <input id="searchInput" type="search" placeholder="종목, 코드, 기법">
+              <select id="techniqueFilter" aria-label="기법 필터">
+                <option value="">전체 기법</option>
+              </select>
+              <select id="stateFilter" aria-label="추천 상태 필터">
+                <option value="">전체 상태</option>
+                <option value="paper_review">paper review</option>
+                <option value="watchlist">watchlist</option>
+                <option value="blocked">blocked</option>
+              </select>
+              <select id="decisionFilter" aria-label="내 판단 필터">
+                <option value="">전체 판단</option>
+                <option value="watch">관심</option>
+                <option value="exclude">제외</option>
+                <option value="memo">메모</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>순위</th>
+                  <th>종목</th>
+                  <th>기법</th>
+                  <th>점수</th>
+                  <th>내 판단</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody id="recommendationRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="panel detail-panel" aria-live="polite">
+          <div class="panel-head compact">
+            <div>
+              <h2 id="detailTitle">선택한 후보</h2>
+              <p id="detailMeta">목록에서 선택</p>
+            </div>
+            <span id="detailState" class="state-chip">-</span>
+          </div>
+          <div class="score-ring">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="60" cy="60" r="48" class="ring-bg"></circle>
+              <circle id="scoreArc" cx="60" cy="60" r="48" class="ring-fg"></circle>
+            </svg>
+            <div>
+              <strong id="detailScore">-</strong>
+              <span>final score</span>
+            </div>
+          </div>
+          <dl class="detail-list">
+            <dt>투자기법</dt><dd id="detailTechnique">-</dd>
+            <dt>근거</dt><dd id="detailEvidence">-</dd>
+            <dt>Paper plan</dt><dd id="detailPlan">-</dd>
+            <dt>차단/리스크</dt><dd id="detailRisk">-</dd>
+          </dl>
+          <div id="componentBars" class="component-bars"></div>
+
+          <div class="decision-box">
+            <div class="decision-head">
+              <strong>내 판단</strong>
+              <span id="decisionStatus">-</span>
+            </div>
+            <textarea id="decisionNote" rows="4" maxlength="500" placeholder="메모"></textarea>
+            <div class="decision-actions">
+              <button id="watchDecisionBtn" type="button">관심 저장</button>
+              <button id="excludeDecisionBtn" type="button">제외</button>
+              <button id="memoDecisionBtn" type="button">메모 저장</button>
+              <button id="clearDecisionBtn" type="button">초기화</button>
+              <button id="addPaperBtn" class="primary-mini" type="button">Paper 추가</button>
+            </div>
+          </div>
+
+          <div class="chart-panel">
+            <div class="chart-head">
+              <strong>가격 히스토리</strong>
+              <span id="chartSummary">-</span>
+            </div>
+            <canvas id="priceChart" height="190"></canvas>
+          </div>
+        </aside>
+      </section>
+
+      <section id="ledger" class="panel ledger-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Paper portfolio ledger</h2>
+            <p id="ledgerSubtitle">추천 결과에서 추가한 paper 포지션</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>종목</th>
+                <th>기법</th>
+                <th>진입일</th>
+                <th>진입가</th>
+                <th>최근가</th>
+                <th>수익률</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="pipeline" class="panel pipeline-panel">
+        <div class="panel-head">
+          <div>
+            <h2>갱신 파이프라인</h2>
+            <p id="jobState">대기 중</p>
+          </div>
+          <form id="pipelineForm" class="pipeline-form">
+            <label>가격 <input name="price_max_tickers" type="number" min="1" max="1000" value="200"></label>
+            <label>수급 <input name="eod_max_tickers" type="number" min="0" max="500" value="30"></label>
+            <label>재무 <input name="fundamental_max_tickers" type="number" min="0" max="500" value="30"></label>
+            <label>Top <input name="top" type="number" min="1" max="50" value="15"></label>
+          </form>
+        </div>
+        <div id="pipelineSteps" class="pipeline-steps"></div>
+        <pre id="jobLog" class="job-log"></pre>
+      </section>
+
+      <section id="data" class="panel data-panel">
+        <div class="panel-head">
+          <div>
+            <h2>데이터 상태</h2>
+            <p>가격, 수급, 공시, 재무, 밸류에이션</p>
+          </div>
+        </div>
+        <div id="dataFiles" class="data-files"></div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

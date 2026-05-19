@@ -162,42 +162,47 @@ def collect_eod_context(
     short_path = output_dir / "short_credit.csv"
     disclosure_path = output_dir / "disclosures.csv"
     updated_at = datetime.now(tz=KST).isoformat(timespec="seconds")
+    existing_investor = read_existing_context(investor_path, INVESTOR_COLUMNS)
+    existing_short_credit = read_existing_context(short_path, SHORT_COLUMNS)
+    existing_disclosures = read_existing_context(disclosure_path, DISCLOSURE_COLUMNS)
     investor_status: dict[str, Any] = {"status": "skipped"}
     short_status: dict[str, Any] = {"status": "skipped"}
     disclosure_status: dict[str, Any] = {"status": "skipped"}
 
     if skip_krx:
-        investor = read_existing_context(investor_path, INVESTOR_COLUMNS)
-        short_credit = read_existing_context(short_path, SHORT_COLUMNS)
+        investor = existing_investor
+        short_credit = existing_short_credit
         investor_status = {"status": "skipped", "reason": "skip_krx", "preserved_rows": int(len(investor))}
         short_status = {"status": "skipped", "reason": "skip_krx", "preserved_rows": int(len(short_credit))}
     elif not (env.get("KRX_ID", "").strip() and env.get("KRX_PW", "").strip()):
-        investor = empty_frame(INVESTOR_COLUMNS)
-        short_credit = empty_frame(SHORT_COLUMNS)
-        investor_status = {"status": "unavailable", "reason": "missing_krx_login_env"}
-        short_status = {"status": "unavailable", "reason": "missing_krx_login_env"}
+        investor = existing_investor
+        short_credit = existing_short_credit
+        investor_status = {"status": "unavailable", "reason": "missing_krx_login_env", "preserved_rows": int(len(investor))}
+        short_status = {"status": "unavailable", "reason": "missing_krx_login_env", "preserved_rows": int(len(short_credit))}
     else:
         configure_krx_login_env(env)
-        investor, investor_status = collect_investor_flows_with_pykrx(
+        new_investor, investor_status = collect_investor_flows_with_pykrx(
             tickers,
             start_date=start_date,
             end_date=end_date,
             updated_at=updated_at,
             sleep_seconds=sleep_seconds,
         )
-        short_credit, short_status = collect_short_credit_with_pykrx(
+        investor = merge_context_frames(existing_investor, new_investor, INVESTOR_COLUMNS, key_columns=["source_bas_dt", "ticker"])
+        new_short_credit, short_status = collect_short_credit_with_pykrx(
             tickers,
             start_date=start_date,
             end_date=end_date,
             updated_at=updated_at,
             sleep_seconds=sleep_seconds,
         )
+        short_credit = merge_context_frames(existing_short_credit, new_short_credit, SHORT_COLUMNS, key_columns=["source_bas_dt", "ticker"])
 
     if skip_dart:
-        disclosures = read_existing_context(disclosure_path, DISCLOSURE_COLUMNS)
+        disclosures = existing_disclosures
         disclosure_status = {"status": "skipped", "reason": "skip_dart", "preserved_rows": int(len(disclosures))}
     else:
-        disclosures, disclosure_status = collect_disclosures(
+        new_disclosures, disclosure_status = collect_disclosures(
             tickers,
             start_date=start_date,
             end_date=end_date,
@@ -206,6 +211,7 @@ def collect_eod_context(
             updated_at=updated_at,
             sleep_seconds=sleep_seconds,
         )
+        disclosures = merge_context_frames(existing_disclosures, new_disclosures, DISCLOSURE_COLUMNS, key_columns=["source_bas_dt", "ticker", "receipt_no"])
 
     investor.to_csv(investor_path, index=False, encoding="utf-8-sig")
     short_credit.to_csv(short_path, index=False, encoding="utf-8-sig")
@@ -545,6 +551,31 @@ def read_existing_context(path: Path, columns: list[str]) -> pd.DataFrame:
         if column not in frame.columns:
             frame[column] = ""
     return frame[columns].copy()
+
+
+def merge_context_frames(existing: pd.DataFrame, new: pd.DataFrame, columns: list[str], *, key_columns: list[str]) -> pd.DataFrame:
+    frames = []
+    for frame in [existing, new]:
+        if frame is None or frame.empty:
+            continue
+        item = frame.copy()
+        for column in columns:
+            if column not in item.columns:
+                item[column] = ""
+        frames.append(item[columns])
+    if not frames:
+        return empty_frame(columns)
+    merged = pd.concat(frames, ignore_index=True)
+    for column in key_columns:
+        if column not in merged.columns:
+            merged[column] = ""
+    if "ticker" in merged.columns:
+        merged["ticker"] = merged["ticker"].map(normalize_ticker)
+    if "source_bas_dt" in merged.columns:
+        merged["source_bas_dt"] = merged["source_bas_dt"].map(normalize_date)
+    merged = merged.drop_duplicates(key_columns, keep="last")
+    sort_columns = [column for column in ["source_bas_dt", "ticker", "receipt_no"] if column in merged.columns]
+    return merged[columns].sort_values(sort_columns).reset_index(drop=True)
 
 
 def normalize_ticker(value: object) -> str:

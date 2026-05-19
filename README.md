@@ -283,3 +283,93 @@ ResearchGate2_민감도검증결과_열기.bat
 output/research_gate2_sensitivity/latest.html
 experiments/registry_rg2_sensitivity.csv
 ```
+
+## 보고서 Top 1 기반 가치/퀄리티 + 모멘텀 MVP
+
+첨부 PDF의 `프로그램 개발 후보 Top 5` 중 1순위인 `가치/퀄리티 + 모멘텀 멀티팩터 포트폴리오 봇`을 별도 MVP로 구현했습니다. 기존 RG2처럼 넓은 팩터 조합을 한 번에 시험하지 않고, 보고서 결론의 1차 MVP에 맞춰 `PER/PBR/ROE + 6~12개월 시장 대비 상대 모멘텀`만 검증합니다.
+
+실행:
+
+```text
+가치모멘텀MVP_실행.bat
+가치모멘텀MVP_결과_열기.bat
+```
+
+출력:
+
+```text
+output/value_momentum_mvp/latest.html
+output/value_momentum_mvp/latest_recommendations.csv
+experiments/registry_value_momentum_mvp.csv
+```
+
+자세한 기준은 `VALUE_MOMENTUM_MVP.md`를 확인합니다. 이 MVP도 실전 주문을 넣지 않으며 최대 상태는 `paper_only`입니다.
+
+## 투자근거 기반 종목 추천기
+
+기존 Research Gate 검증 흐름과 분리한 일일 종목 추천 프로그램입니다. 단순 팩터 조합이 아니라 투자기법별 근거를 따로 점수화합니다.
+
+웹앱 실행:
+
+```text
+KR_DayPilot_웹앱_실행.bat
+```
+
+브라우저 주소:
+
+```text
+http://127.0.0.1:8765/
+```
+
+투자기법:
+
+```text
+Quality Value Momentum
+Defensive Trend Compounder
+Flow-Backed Re-Rating
+Event-Safe Recovery
+```
+
+실행:
+
+```text
+가격데이터갱신_실행.bat
+투자근거추천_실행.bat
+투자근거추천_결과_열기.bat
+```
+
+`투자근거추천_실행.bat`은 가격 데이터 갱신, EOD 수급/공시 컨텍스트 갱신, 펀더멘털/밸류에이션 갱신, 추천기 실행을 순서대로 수행합니다.
+
+CLI:
+
+```text
+python -m kr_precision_backtest.run_recommender_pipeline --price-source auto --price-max-tickers 200 --eod-max-tickers 30 --fundamental-max-tickers 30 --top 15
+python -m kr_precision_backtest.collect_price_history --source auto --max-tickers 300
+python -m kr_precision_backtest.run_investment_recommender --top 15
+python -m kr_precision_backtest.run_investment_recommender --run-date 20260519 --max-price-age-days 7
+```
+
+출력:
+
+```text
+output/investment_recommender/latest.html
+output/investment_recommender/latest.csv
+output/investment_recommender/latest_summary.json
+```
+
+## 웹앱 완성본 실행
+
+`KR_DayPilot_웹앱_실행.bat` 하나로 서버 실행, 상태 점검, 브라우저 오픈을 처리합니다.
+
+웹앱에서 지원하는 의사결정 흐름:
+
+- 추천 후보별 관심 저장, 제외, 메모
+- 추천 후보를 paper portfolio ledger에 추가
+- paper 포지션의 최근가 기준 손익률 추적
+- 종목별 가격 히스토리 차트와 상세 근거 확인
+
+사용자 판단과 paper ledger는 `runtime/webapp/` 아래에 로컬 상태로 저장됩니다.
+
+로컬 가격 데이터가 실행일 기준 7일보다 오래되면 기본 상태는 `stale_data`가 되고 추천 후보는 비워집니다. 과거 데이터 점검 목적이면 `--allow-stale-data`를 붙여 별도 출력 폴더에 저장합니다.
+
+외부 오픈소스 반영 상태는 `docs/OPEN_SOURCE_INTEGRATION_STATUS.md`, 자세한 추천기 설계는 `docs/INVESTMENT_RECOMMENDER_SPEC.md`를 확인합니다. 이 추천기는 실전 주문을 넣지 않으며 최대 상태는 `paper_review`입니다.

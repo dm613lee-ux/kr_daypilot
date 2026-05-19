@@ -130,7 +130,7 @@ def resolve_scope(
     tickers: list[str] = []
     days: list[str] = []
     if price_history_path.exists():
-        history = pd.read_csv(price_history_path, dtype={"ticker": str, "source_bas_dt": str}).fillna("")
+        history = pd.read_csv(price_history_path, dtype={"ticker": str, "isin": str, "source_bas_dt": str}, low_memory=False).fillna("")
         if "ticker" in history.columns:
             tickers.extend(normalize_ticker(value) for value in history["ticker"].tolist())
         if "source_bas_dt" in history.columns:

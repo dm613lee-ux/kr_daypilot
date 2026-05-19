@@ -27,6 +27,9 @@ output/feature_validation/
 output/research_gate1/
 output/research_gate2/
 output/research_gate2_sensitivity/
+output/value_momentum_mvp/
+output/investment_recommender/
+output/investment_recommender_pipeline/
 output/phase1_*.csv
 output/phase1_*.html
 output/phase1_*.json
