@@ -82,6 +82,24 @@ jobs:
       - name: Build static site
         run: python -m kr_precision_backtest.build_static_site --output site
 
+      - name: Validate static site data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          dashboard = json.loads(Path("site/data/dashboard.json").read_text(encoding="utf-8"))
+          recommended = int(dashboard.get("summary", {}).get("recommended") or 0)
+          core_recommended = int(dashboard.get("core_summary", {}).get("recommended") or 0)
+          fundamentals = int(dashboard.get("data_files", {}).get("fundamentals", {}).get("rows") or 0)
+          valuation = int(dashboard.get("data_files", {}).get("valuation", {}).get("rows") or 0)
+          if recommended <= 0 and core_recommended <= 0:
+              raise SystemExit("No recommendations were generated; refusing to deploy empty dashboard.")
+          if fundamentals <= 0 or valuation <= 0:
+              raise SystemExit("Fundamental/valuation seed data is empty; refusing to deploy blocked-only dashboard.")
+          print(f"validated recommendations={recommended}, core={core_recommended}, fundamentals={fundamentals}, valuation={valuation}")
+          PY
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
