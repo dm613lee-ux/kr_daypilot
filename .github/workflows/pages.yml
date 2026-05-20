@@ -2,6 +2,15 @@ name: Build and deploy KR DayPilot Pages
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/pages.yml"
+      - "src/**"
+      - "webapp/**"
+      - "data/kr_universe.csv"
+      - "pyproject.toml"
   schedule:
     # 18:37 KST on weekdays, after the regular Korean market session.
     - cron: "37 9 * * 1-5"
