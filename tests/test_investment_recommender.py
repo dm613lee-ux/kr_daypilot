@@ -7,8 +7,10 @@ import pandas as pd
 
 from kr_precision_backtest.investment_recommender import (
     InvestmentRecommenderConfig,
+    attach_flow_features,
     build_recommendations,
     json_ready,
+    rank_score,
     score_day_rows,
 )
 
@@ -107,6 +109,13 @@ class InvestmentRecommenderTest(unittest.TestCase):
         self.assertEqual(scored.iloc[0]["state"], "blocked")
         self.assertIn("disclosure_risk", scored.iloc[0]["block_reason"])
 
+    def test_rank_score_leaves_missing_values_unranked(self) -> None:
+        ranked = rank_score(pd.Series([1.0, pd.NA, 3.0], dtype="Float64"))
+
+        self.assertAlmostEqual(float(ranked.iloc[0]), 50.0)
+        self.assertTrue(pd.isna(ranked.iloc[1]))
+        self.assertAlmostEqual(float(ranked.iloc[2]), 100.0)
+
     def test_build_recommendations_uses_only_fundamentals_available_by_asof(self) -> None:
         history_rows = self._history_rows()
         fundamentals = pd.DataFrame(
@@ -198,6 +207,39 @@ class InvestmentRecommenderTest(unittest.TestCase):
         self.assertFalse(recommendations.empty)
         self.assertEqual(summary["state"], "paper_review_stale")
         self.assertTrue(summary["data_freshness"]["price_is_stale"])
+
+    def test_attach_flow_features_uses_latest_prior_flow_date(self) -> None:
+        history = pd.DataFrame(
+            [
+                {
+                    "ticker": "000001",
+                    "source_bas_dt": "20260519",
+                    "avg_value_20": 1_000_000_000.0,
+                }
+            ]
+        )
+        investor_flows = pd.DataFrame(
+            [
+                {
+                    "ticker": "000001",
+                    "source_bas_dt": "20260516",
+                    "foreign_net_buy_value": 10_000_000.0,
+                    "institution_net_buy_value": 20_000_000.0,
+                },
+                {
+                    "ticker": "000001",
+                    "source_bas_dt": "20260518",
+                    "foreign_net_buy_value": 30_000_000.0,
+                    "institution_net_buy_value": 40_000_000.0,
+                },
+            ]
+        )
+
+        enriched = attach_flow_features(history, investor_flows)
+
+        self.assertEqual(enriched.iloc[0]["smart_flow_asof_dt"], "20260518")
+        self.assertEqual(float(enriched.iloc[0]["smart_flow_5d_value"]), 100_000_000.0)
+        self.assertAlmostEqual(float(enriched.iloc[0]["smart_flow_20d_pressure_pct"]), 10.0)
 
     def test_json_ready_removes_nan_and_pandas_na(self) -> None:
         payload = {"items": [{"ticker": "000001", "score": float("nan"), "reason": pd.NA}]}

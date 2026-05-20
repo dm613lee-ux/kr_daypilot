@@ -89,6 +89,31 @@ class FundamentalCoreEngineTest(unittest.TestCase):
         self.assertIn("core_trend_break", scored.iloc[0]["block_reason"])
         self.assertIn("core_high_volatility", scored.iloc[0]["block_reason"])
 
+    def test_core_engine_blocks_missing_fundamentals(self) -> None:
+        rows = pd.DataFrame(
+            [
+                self._row(
+                    "000001",
+                    per=5.0,
+                    pbr=0.5,
+                    dividend_yield=3.0,
+                    relative_momentum_120d_pct=30.0,
+                    relative_momentum_240d_pct=45.0,
+                    ret_60d_pct=20.0,
+                    price_vs_ma120_pct=15.0,
+                    volatility_60d_pct=2.0,
+                    drawdown_60d_pct=-3.0,
+                    smart_flow_20d_pressure_pct=5.0,
+                    fundamental_available=False,
+                )
+            ]
+        )
+
+        scored = score_core_day_rows(rows, FundamentalCoreConfig(min_score_for_review=0))
+
+        self.assertEqual(scored.iloc[0]["state"], "blocked")
+        self.assertIn("missing_fundamentals", scored.iloc[0]["block_reason"])
+
     def _row(self, ticker: str, **overrides: object) -> dict[str, object]:
         row: dict[str, object] = {
             "ticker": ticker,

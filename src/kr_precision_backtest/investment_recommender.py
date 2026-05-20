@@ -297,6 +297,7 @@ def attach_flow_features(history: pd.DataFrame, investor_flows: pd.DataFrame | N
     if investor_flows is None or investor_flows.empty:
         df["smart_flow_5d_value"] = 0.0
         df["smart_flow_20d_value"] = 0.0
+        df["smart_flow_asof_dt"] = ""
         df["smart_flow_5d_pressure_pct"] = 0.0
         df["smart_flow_20d_pressure_pct"] = 0.0
         return df
@@ -313,8 +314,31 @@ def attach_flow_features(history: pd.DataFrame, investor_flows: pd.DataFrame | N
     grouped = flows.groupby("ticker", group_keys=False)
     flows["smart_flow_5d_value"] = grouped["smart_flow_value"].transform(lambda s: s.rolling(5, min_periods=1).sum())
     flows["smart_flow_20d_value"] = grouped["smart_flow_value"].transform(lambda s: s.rolling(20, min_periods=1).sum())
-    keep = ["ticker", "source_bas_dt", "smart_flow_5d_value", "smart_flow_20d_value"]
-    merged = df.merge(flows[keep], on=["ticker", "source_bas_dt"], how="left")
+    flows["smart_flow_asof_dt"] = flows["source_bas_dt"]
+    flows["_flow_date"] = pd.to_datetime(flows["source_bas_dt"], format="%Y%m%d", errors="coerce")
+    hist = df.copy()
+    hist["_history_date"] = pd.to_datetime(hist["source_bas_dt"], format="%Y%m%d", errors="coerce")
+    pieces: list[pd.DataFrame] = []
+    for ticker, ticker_history in hist.groupby("ticker", sort=False):
+        ticker_flows = flows[(flows["ticker"] == ticker) & flows["_flow_date"].notna()].copy()
+        if ticker_flows.empty:
+            pieces.append(ticker_history)
+            continue
+        merged_piece = pd.merge_asof(
+            ticker_history.sort_values("_history_date").drop(columns=["smart_flow_5d_value", "smart_flow_20d_value", "smart_flow_asof_dt"], errors="ignore"),
+            ticker_flows.sort_values("_flow_date")[["_flow_date", "smart_flow_asof_dt", "smart_flow_5d_value", "smart_flow_20d_value"]],
+            left_on="_history_date",
+            right_on="_flow_date",
+            direction="backward",
+        )
+        pieces.append(merged_piece)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        merged = pd.concat(pieces, ignore_index=True) if pieces else hist
+    merged = merged.drop(columns=["_history_date", "_flow_date"], errors="ignore")
+    if "smart_flow_asof_dt" not in merged.columns:
+        merged["smart_flow_asof_dt"] = ""
+    merged["smart_flow_asof_dt"] = merged["smart_flow_asof_dt"].fillna("")
     for column in ["smart_flow_5d_value", "smart_flow_20d_value"]:
         merged[column] = pd.to_numeric(merged[column], errors="coerce").fillna(0.0)
     denominator = pd.to_numeric(merged["avg_value_20"], errors="coerce").replace(0, float("nan"))
@@ -578,11 +602,12 @@ def safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
 
 
 def rank_score(values: pd.Series, *, higher_is_better: bool = True) -> pd.Series:
-    numeric = pd.to_numeric(values, errors="coerce")
-    numeric = numeric.where(numeric.replace([float("inf"), float("-inf")], pd.NA).notna())
+    numeric = pd.to_numeric(values, errors="coerce").astype("Float64")
+    finite = numeric.notna() & (numeric != float("inf")) & (numeric != float("-inf"))
+    numeric = numeric.where(finite)
     if numeric.notna().sum() == 0:
         return pd.Series(pd.NA, index=values.index, dtype="Float64")
-    ranked = numeric if higher_is_better else -numeric
+    ranked = numeric.astype("float64") if higher_is_better else -numeric.astype("float64")
     return (ranked.rank(method="average", pct=True) * 100.0).astype("Float64")
 
 

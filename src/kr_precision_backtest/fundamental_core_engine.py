@@ -179,6 +179,7 @@ def core_block_reasons(df: pd.DataFrame, config: FundamentalCoreConfig) -> list[
             (to_float(row.get("close")) > 0, "invalid_price"),
             (to_float(row.get("market_cap")) >= config.min_market_cap_krw, "small_market_cap"),
             (to_float(row.get("avg_value_20")) >= config.min_avg_value_20d_krw, "low_liquidity"),
+            (boolish(row.get("fundamental_available", True)), "missing_fundamentals"),
             (not boolish(row.get("disclosure_risk_flag", False)), "disclosure_risk"),
             (pd.notna(row.get("final_score")), "missing_score"),
         ]

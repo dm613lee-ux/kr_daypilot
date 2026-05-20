@@ -18,7 +18,12 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from .investment_recommender import json_ready
+from .investment_recommender import (
+    InvestmentRecommenderConfig,
+    assess_price_data_freshness,
+    determine_summary_state,
+    json_ready,
+)
 
 
 KST = ZoneInfo("Asia/Seoul")
@@ -26,7 +31,7 @@ PROGRAM_ROOT = Path(__file__).resolve().parents[2]
 WEB_ROOT = PROGRAM_ROOT / "webapp"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-APP_BUILD_ID = "20260519-fundamental-core-v1"
+APP_BUILD_ID = "20260520-freshness-audit-v1"
 APP_STATE_DIR = Path("runtime") / "webapp"
 DECISIONS_FILE = "user_decisions.json"
 PAPER_LEDGER_FILE = "paper_ledger.csv"
@@ -228,6 +233,8 @@ def load_dashboard_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, objec
     core_summary = core_recommendation_payload.get("summary", {})
     if not isinstance(core_summary, dict):
         core_summary = {}
+    summary = refresh_summary_freshness(summary, recommendation_payload.get("config", {}))
+    core_summary = refresh_summary_freshness(core_summary, core_recommendation_payload.get("config", {}))
     return {
         "generated_at": datetime.now(tz=KST).isoformat(timespec="seconds"),
         "summary": summary,
@@ -253,6 +260,35 @@ def load_dashboard_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, objec
             "core_summary_json": str(core_recommendation_path),
         },
     }
+
+
+def refresh_summary_freshness(summary: dict[str, object], config: object, *, current_day: str | None = None) -> dict[str, object]:
+    refreshed = dict(summary)
+    freshness = refreshed.get("data_freshness", {})
+    if not isinstance(freshness, dict):
+        freshness = {}
+    config_dict = config if isinstance(config, dict) else {}
+    signal_day = str(freshness.get("signal_day") or refreshed.get("signal_day") or refreshed.get("as_of") or "")
+    if not signal_day:
+        return refreshed
+    max_age = safe_int(
+        config_dict.get("max_price_age_calendar_days", freshness.get("max_price_age_calendar_days", 7)),
+        default=7,
+    )
+    cfg = InvestmentRecommenderConfig(
+        max_price_age_calendar_days=max_age,
+        allow_stale_price_data=bool(config_dict.get("allow_stale_price_data", False)),
+    )
+    run_day = current_day or datetime.now(tz=KST).strftime("%Y%m%d")
+    refreshed_freshness = assess_price_data_freshness(signal_day, run_day, cfg)
+    refreshed["data_freshness"] = refreshed_freshness
+    state_counts = {
+        "paper_review": safe_int(refreshed.get("paper_review")),
+        "watchlist": safe_int(refreshed.get("watchlist")),
+        "blocked": safe_int(refreshed.get("blocked")),
+    }
+    refreshed["state"] = determine_summary_state(state_counts, refreshed_freshness, cfg)
+    return refreshed
 
 
 def health_payload(program_root: Path = PROGRAM_ROOT) -> dict[str, object]:

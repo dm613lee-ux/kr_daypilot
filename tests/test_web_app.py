@@ -13,6 +13,7 @@ from kr_precision_backtest.run_web_app import (
     load_paper_ledger,
     load_dashboard_payload,
     load_ticker_detail_payload,
+    refresh_summary_freshness,
     remove_paper_position,
     save_user_decision,
     sanitize_pipeline_options,
@@ -107,6 +108,29 @@ class WebAppTest(unittest.TestCase):
             self.assertEqual(payload["engine_comparison"]["counts"]["consensus"], 1)
             self.assertEqual(payload["engine_comparison"]["counts"]["core_pick"], 1)
             self.assertEqual(payload["engine_comparison"]["counts"]["tactical_watch"], 1)
+
+    def test_refresh_summary_freshness_uses_current_day(self) -> None:
+        summary = {
+            "signal_day": "20260519",
+            "state": "paper_review",
+            "paper_review": 1,
+            "watchlist": 0,
+            "blocked": 0,
+            "data_freshness": {
+                "run_date": "20260519",
+                "signal_day": "20260519",
+                "price_age_calendar_days": 0,
+                "max_price_age_calendar_days": 0,
+                "price_is_stale": False,
+            },
+        }
+
+        refreshed = refresh_summary_freshness(summary, {"max_price_age_calendar_days": 0}, current_day="20260520")
+
+        self.assertEqual(refreshed["data_freshness"]["run_date"], "20260520")
+        self.assertEqual(refreshed["data_freshness"]["price_age_calendar_days"], 1)
+        self.assertTrue(refreshed["data_freshness"]["price_is_stale"])
+        self.assertEqual(refreshed["state"], "stale_data")
 
     def test_add_paper_position_can_use_core_engine_recommendation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
