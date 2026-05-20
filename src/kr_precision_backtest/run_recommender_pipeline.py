@@ -26,6 +26,7 @@ class PipelineConfig:
     from_date: str
     to_date: str
     run_date: str
+    tickers: str = ""
     price_source: str = "auto"
     price_max_tickers: int = 300
     eod_max_tickers: int = 100
@@ -51,6 +52,7 @@ def main() -> int:
     parser.add_argument("--to-date", default="")
     parser.add_argument("--run-date", default="")
     parser.add_argument("--price-source", choices=["auto", "fdr", "pykrx", "pykrx-bulk"], default="auto")
+    parser.add_argument("--tickers", default="", help="Comma-separated ticker list for the price refresh step.")
     parser.add_argument("--price-max-tickers", type=int, default=300, help="0 means all tickers.")
     parser.add_argument("--eod-max-tickers", type=int, default=100)
     parser.add_argument("--fundamental-max-tickers", type=int, default=300)
@@ -67,6 +69,7 @@ def main() -> int:
         from_date=window["from_date"],
         to_date=window["to_date"],
         run_date=window["run_date"],
+        tickers=args.tickers,
         price_source=args.price_source,
         price_max_tickers=max(args.price_max_tickers, 0),
         eod_max_tickers=max(args.eod_max_tickers, 0),
@@ -131,6 +134,8 @@ def build_pipeline_steps(config: PipelineConfig, *, python_executable: str) -> l
             True,
         )
     ]
+    if config.tickers:
+        steps[0].command.extend(["--tickers", config.tickers])
     if not config.skip_eod_context:
         steps.append(
             PipelineStep(

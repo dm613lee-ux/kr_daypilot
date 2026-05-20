@@ -49,6 +49,7 @@ class RecommenderPipelineTest(unittest.TestCase):
             from_date="20260508",
             to_date="20260519",
             run_date="20260519",
+            tickers="005930,000660",
             price_source="pykrx-bulk",
             price_max_tickers=0,
             eod_max_tickers=25,
@@ -62,6 +63,8 @@ class RecommenderPipelineTest(unittest.TestCase):
         self.assertIn("kr_precision_backtest.collect_price_history", steps[0].command)
         self.assertIn("--source", steps[0].command)
         self.assertIn("pykrx-bulk", steps[0].command)
+        self.assertIn("--tickers", steps[0].command)
+        self.assertIn("005930,000660", steps[0].command)
         self.assertIn("--run-date", steps[-1].command)
         self.assertIn("20260519", steps[-1].command)
         self.assertIn("kr_precision_backtest.run_fundamental_core", steps[-1].command)

@@ -11,6 +11,7 @@ on:
       - "webapp/**"
       - "data/eod_context/**"
       - "data/fundamentals/**"
+      - "data/deploy_tickers.csv"
       - "data/kr_universe.csv"
       - "pyproject.toml"
   schedule:
@@ -67,14 +68,30 @@ jobs:
               handle.write(f"TO_DATE={today:%Y%m%d}\n")
           PY
 
+      - name: Load deployment ticker universe
+        run: |
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          tickers = pd.read_csv("data/deploy_tickers.csv", dtype={"ticker": str})["ticker"].astype(str).str.zfill(6).tolist()
+          if not tickers:
+              raise SystemExit("data/deploy_tickers.csv has no tickers")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"DEPLOY_TICKERS={','.join(tickers)}\n")
+              handle.write(f"DEPLOY_TICKER_COUNT={len(tickers)}\n")
+          print(f"Loaded {len(tickers)} deployment tickers")
+          PY
+
       - name: Refresh recommendation outputs
         run: |
           python -m kr_precision_backtest.run_recommender_pipeline \
             --from-date "$FROM_DATE" \
             --to-date "$TO_DATE" \
             --run-date "$TO_DATE" \
+            --tickers "$DEPLOY_TICKERS" \
             --price-source auto \
-            --price-max-tickers 250 \
+            --price-max-tickers "$DEPLOY_TICKER_COUNT" \
             --eod-max-tickers 30 \
             --fundamental-max-tickers 120 \
             --top 20
