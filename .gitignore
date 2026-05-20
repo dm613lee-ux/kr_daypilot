@@ -12,6 +12,13 @@ data/performance/
 data/live_context/
 data/eod_context/
 data/fundamentals/
+!data/eod_context/
+!data/eod_context/investor_flows.csv
+!data/eod_context/disclosures.csv
+!data/eod_context/short_credit.csv
+!data/fundamentals/
+!data/fundamentals/fundamental_snapshots.csv
+!data/fundamentals/krx_valuation.csv
 data/reference/dart_corp_codes.csv
 output/intraday/
 output/daily_pipeline/

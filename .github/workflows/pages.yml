@@ -9,6 +9,8 @@ on:
       - ".github/workflows/pages.yml"
       - "src/**"
       - "webapp/**"
+      - "data/eod_context/**"
+      - "data/fundamentals/**"
       - "data/kr_universe.csv"
       - "pyproject.toml"
   schedule:
