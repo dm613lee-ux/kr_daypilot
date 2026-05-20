@@ -52,6 +52,16 @@ python -m kr_precision_backtest.run_investment_recommender --top 15
 python -m kr_precision_backtest.collect_price_history --source auto --max-tickers 200
 ```
 
+## GitHub Pages 배포
+
+서버를 24시간 켜두지 않는 무료 개인용 배포는 GitHub Actions + GitHub Pages 정적 빌드를 사용합니다.
+
+```powershell
+python -m kr_precision_backtest.build_static_site --output site
+```
+
+상세 절차는 `docs/current/GITHUB_PAGES_DEPLOYMENT.md`를 확인합니다.
+
 ## 정리 정책
 
 과거 실험, 기각된 검증 앱, ResearchGate, 분봉/스윙/가치모멘텀 MVP 산출물은 운영본에서 제외했습니다. 삭제하지 않고 `_archive/` 아래로 이동해 필요하면 되돌릴 수 있게 보존합니다.

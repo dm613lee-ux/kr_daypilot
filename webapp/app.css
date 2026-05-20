@@ -175,6 +175,11 @@ button, input, select {
   font-weight: 700;
 }
 
+body.static-mode .primary-action {
+  background: #2558d8;
+  border-color: #2558d8;
+}
+
 .secondary-action {
   background: var(--panel);
   color: var(--ink);
@@ -714,6 +719,11 @@ tbody tr.negative td.score-cell {
 .pipeline-form input {
   width: 82px;
   min-width: 82px;
+}
+
+body.static-mode .pipeline-form {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .pipeline-steps,

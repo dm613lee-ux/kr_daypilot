@@ -17,6 +17,10 @@ const techniqueDescriptions = {
   "Quality Value Momentum": "가치, 재무 품질, 모멘텀을 균형 있게 보는 다요인 랭킹 기법입니다. 싸지만 약한 종목이나 강하지만 비싼 종목을 걸러냅니다.",
   "Fundamental Core Composite": "다요인 펀더멘털을 중심축으로 고정한 코어 엔진입니다. 가치·품질·유동성을 먼저 보고, 가치+모멘텀은 순위 보강, 저변동성+추세는 리스크 필터, 공시·수급은 확인 신호로 사용합니다.",
 };
+const STATIC_MODE = Boolean(window.KR_DAYPILOT_STATIC);
+const STATIC_BASE = normalizeStaticBase(window.KR_DAYPILOT_BASE || ".");
+const LOCAL_DECISIONS_KEY = "kr_daypilot_static_decisions_v1";
+const LOCAL_LEDGER_KEY = "kr_daypilot_static_paper_ledger_v1";
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
@@ -25,7 +29,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function bindEvents() {
   document.getElementById("refreshViewBtn").addEventListener("click", loadDashboard);
-  document.getElementById("runPipelineBtn").addEventListener("click", startPipeline);
+  const runPipelineButton = document.getElementById("runPipelineBtn");
+  runPipelineButton.addEventListener("click", startPipeline);
+  if (STATIC_MODE) {
+    document.body.classList.add("static-mode");
+    runPipelineButton.title = "Static Pages mode: refresh runs in GitHub Actions.";
+  }
   document.getElementById("searchInput").addEventListener("input", applyFilters);
   document.getElementById("techniqueFilter").addEventListener("change", applyFilters);
   document.getElementById("stateFilter").addEventListener("change", applyFilters);
@@ -41,7 +50,7 @@ function bindEvents() {
 }
 
 async function loadDashboard() {
-  const payload = await fetchJson("/api/dashboard");
+  const payload = STATIC_MODE ? await loadStaticDashboard() : await fetchJson("/api/dashboard");
   state.payload = payload;
   state.recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
   state.coreRecommendations = Array.isArray(payload.core_recommendations) ? payload.core_recommendations : [];
@@ -83,6 +92,128 @@ async function fetchJson(url, options = {}) {
     throw new Error(payload.error || `request_failed_${response.status}`);
   }
   return payload;
+}
+
+function normalizeStaticBase(value) {
+  const text = String(value || ".").replace(/\/+$/, "");
+  return text || ".";
+}
+
+function staticUrl(path) {
+  return `${STATIC_BASE}/${String(path || "").replace(/^\/+/, "")}`;
+}
+
+async function loadStaticDashboard() {
+  const payload = await fetchJson(staticUrl("data/dashboard.json"));
+  state.localDecisions = loadLocalDecisions();
+  state.localLedger = enrichLocalLedger(loadLocalLedger(), payload);
+  return applyStaticPersonalState(payload);
+}
+
+function applyStaticPersonalState(payload) {
+  const cloned = JSON.parse(JSON.stringify(payload || {}));
+  cloned.user_decisions = state.localDecisions || {};
+  cloned.paper_ledger = state.localLedger || [];
+  cloned.paper_portfolio_summary = summarizeLocalLedger(cloned.paper_ledger);
+  cloned.recommendations = mergeStaticUserState(cloned.recommendations || [], cloned.user_decisions, cloned.paper_ledger);
+  cloned.core_recommendations = mergeStaticUserState(cloned.core_recommendations || [], cloned.user_decisions, cloned.paper_ledger);
+  return cloned;
+}
+
+function mergeStaticUserState(recommendations, decisions, ledger) {
+  const openPositions = {};
+  (ledger || []).forEach((item) => {
+    if (item.status === "open" && item.ticker) openPositions[item.ticker] = item;
+  });
+  return (recommendations || []).map((item) => {
+    const ticker = normalizeTicker(item.ticker);
+    const decision = decisions[ticker] || {};
+    return {
+      ...item,
+      user_status: decision.status || "",
+      user_note: decision.note || "",
+      paper_position: openPositions[ticker] || {},
+    };
+  });
+}
+
+function loadLocalDecisions() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_DECISIONS_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function storeLocalDecisions(decisions) {
+  localStorage.setItem(LOCAL_DECISIONS_KEY, JSON.stringify(decisions || {}));
+}
+
+function loadLocalLedger() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_LEDGER_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function storeLocalLedger(ledger) {
+  localStorage.setItem(LOCAL_LEDGER_KEY, JSON.stringify(ledger || []));
+}
+
+function latestPricesByTicker(payload) {
+  const prices = {};
+  [payload.recommendations || [], payload.core_recommendations || []].forEach((list) => {
+    list.forEach((item) => {
+      const ticker = normalizeTicker(item.ticker);
+      const close = numberOrNull(item.latest_close ?? item.close);
+      if (ticker && close != null) {
+        prices[ticker] = { latest_close: close, latest_day: String(item.source_bas_dt || item.latest_day || "") };
+      }
+    });
+  });
+  return prices;
+}
+
+function enrichLocalLedger(ledger, payload) {
+  const prices = latestPricesByTicker(payload || {});
+  return (ledger || []).map((item) => {
+    const ticker = normalizeTicker(item.ticker);
+    const entryPrice = numberOrNull(item.entry_price) || 0;
+    const quantity = Math.max(1, Number.parseInt(item.quantity || "1", 10) || 1);
+    const latest = prices[ticker] || {};
+    const latestClose = numberOrNull(latest.latest_close ?? item.latest_close ?? entryPrice);
+    const pnlPct = latestClose != null && entryPrice > 0 ? ((latestClose / entryPrice) - 1) * 100 : null;
+    const pnlKrw = latestClose != null && entryPrice > 0 ? (latestClose - entryPrice) * quantity : null;
+    return {
+      ...item,
+      ticker,
+      entry_price: entryPrice,
+      quantity,
+      status: item.status || "open",
+      latest_close: latestClose,
+      latest_day: latest.latest_day || item.latest_day || item.entry_date || "",
+      pnl_pct: pnlPct,
+      pnl_krw: pnlKrw,
+    };
+  }).filter((item) => item.ticker);
+}
+
+function summarizeLocalLedger(ledger) {
+  const openItems = (ledger || []).filter((item) => item.status === "open");
+  const totalCost = openItems.reduce((sum, item) => sum + ((numberOrNull(item.entry_price) || 0) * (Number.parseInt(item.quantity || "0", 10) || 0)), 0);
+  const totalPnl = openItems.reduce((sum, item) => sum + (numberOrNull(item.pnl_krw) || 0), 0);
+  const pnlPcts = openItems.map((item) => numberOrNull(item.pnl_pct)).filter((value) => value != null);
+  return {
+    positions: ledger.length,
+    open_positions: openItems.length,
+    closed_positions: ledger.length - openItems.length,
+    total_cost: totalCost,
+    total_pnl_krw: totalPnl,
+    avg_pnl_pct: pnlPcts.length ? pnlPcts.reduce((sum, value) => sum + value, 0) / pnlPcts.length : null,
+  };
 }
 
 function renderDashboard(payload) {
@@ -225,7 +356,7 @@ function renderDetail(item) {
 async function loadTickerDetail(ticker) {
   document.getElementById("chartSummary").textContent = "loading";
   try {
-    const payload = await fetchJson(`/api/ticker?ticker=${encodeURIComponent(ticker)}`);
+    const payload = STATIC_MODE ? await loadStaticTickerDetail(ticker) : await fetchJson(`/api/ticker?ticker=${encodeURIComponent(ticker)}`);
     if (ticker !== state.selectedTicker) return;
     state.tickerDetail = payload;
     const decision = payload.decision || {};
@@ -239,8 +370,24 @@ async function loadTickerDetail(ticker) {
   }
 }
 
+async function loadStaticTickerDetail(ticker) {
+  const normalizedTicker = normalizeTicker(ticker);
+  const payload = await fetchJson(staticUrl(`data/tickers/${normalizedTicker}.json`));
+  const decisions = state.localDecisions || loadLocalDecisions();
+  const ledger = state.localLedger || enrichLocalLedger(loadLocalLedger(), state.payload || {});
+  return {
+    ...payload,
+    decision: decisions[normalizedTicker] || { ticker: normalizedTicker, status: "", note: "", updated_at: "" },
+    open_position: ledger.find((item) => item.ticker === normalizedTicker && item.status === "open") || {},
+  };
+}
+
 async function saveDecision(status) {
   if (!state.selectedTicker) return;
+  if (STATIC_MODE) {
+    await saveStaticDecision(status);
+    return;
+  }
   const note = status === "clear" ? "" : document.getElementById("decisionNote").value;
   const buttonMap = {
     watch: "watchDecisionBtn",
@@ -264,8 +411,31 @@ async function saveDecision(status) {
   }
 }
 
+async function saveStaticDecision(status) {
+  const ticker = normalizeTicker(state.selectedTicker);
+  if (!ticker) return;
+  const decisions = loadLocalDecisions();
+  if (status === "clear") {
+    delete decisions[ticker];
+  } else {
+    decisions[ticker] = {
+      ticker,
+      status,
+      note: document.getElementById("decisionNote").value,
+      updated_at: new Date().toISOString(),
+    };
+  }
+  storeLocalDecisions(decisions);
+  await loadDashboard();
+}
+
 async function addPaperPosition() {
   if (!state.selectedTicker) return;
+  if (STATIC_MODE) {
+    await addStaticPaperPosition();
+    document.getElementById("ledger").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   const button = document.getElementById("addPaperBtn");
   button.disabled = true;
   try {
@@ -283,9 +453,44 @@ async function addPaperPosition() {
   }
 }
 
+async function addStaticPaperPosition() {
+  const ticker = normalizeTicker(state.selectedTicker);
+  const recommendation = findRecommendationByTicker(ticker);
+  if (!ticker || !recommendation) return;
+  const ledger = enrichLocalLedger(loadLocalLedger(), state.payload || {});
+  const existing = ledger.find((item) => item.ticker === ticker && item.status === "open");
+  if (existing) {
+    await loadDashboard();
+    return;
+  }
+  const entryPrice = numberOrNull(recommendation.close ?? recommendation.latest_close);
+  if (!entryPrice || entryPrice <= 0) return;
+  ledger.push({
+    entry_id: `${ticker}-${Date.now()}`,
+    opened_at: new Date().toISOString(),
+    entry_date: recommendation.source_bas_dt || "",
+    ticker,
+    company: recommendation.company || "",
+    technique: recommendation.technique || "",
+    final_score: numberOrNull(recommendation.final_score),
+    entry_price: entryPrice,
+    quantity: 1,
+    status: "open",
+    note: document.getElementById("decisionNote").value,
+    close_date: "",
+    close_price: "",
+  });
+  storeLocalLedger(enrichLocalLedger(ledger, state.payload || {}));
+  await loadDashboard();
+}
+
 async function removePaperPosition(entryId, ticker, company) {
   const label = company || ticker || "선택한 포지션";
   if (!window.confirm(`${label} paper ledger 항목을 제거할까요?`)) return;
+  if (STATIC_MODE) {
+    await removeStaticPaperPosition(entryId, ticker);
+    return;
+  }
   try {
     await fetchJson("/api/ledger/remove", {
       method: "POST",
@@ -296,6 +501,17 @@ async function removePaperPosition(entryId, ticker, company) {
   } catch (error) {
     document.getElementById("ledgerSubtitle").textContent = String(error.message || error);
   }
+}
+
+async function removeStaticPaperPosition(entryId, ticker) {
+  const normalizedTicker = normalizeTicker(ticker);
+  const ledger = enrichLocalLedger(loadLocalLedger(), state.payload || {}).filter((item) => {
+    const sameEntry = entryId && item.entry_id === entryId;
+    const sameTicker = normalizedTicker && item.ticker === normalizedTicker && item.status === "open";
+    return !(sameEntry || sameTicker);
+  });
+  storeLocalLedger(ledger);
+  await loadDashboard();
 }
 
 function setScoreArc(score) {
@@ -508,6 +724,19 @@ function renderDataFiles(files) {
 }
 
 async function startPipeline() {
+  if (STATIC_MODE) {
+    renderJob({
+      running: false,
+      finished_at: new Date().toISOString(),
+      returncode: 0,
+      lines: [
+        "Static GitHub Pages mode.",
+        "Data refresh is handled by the GitHub Actions workflow.",
+        "Use the Actions tab and run the Pages workflow manually when you need an immediate refresh.",
+      ],
+    });
+    return;
+  }
   const button = document.getElementById("runPipelineBtn");
   button.disabled = true;
   const form = new FormData(document.getElementById("pipelineForm"));
@@ -551,6 +780,21 @@ function renderJob(job) {
         : "대기 중";
   const lines = Array.isArray(job.lines) ? job.lines : [];
   document.getElementById("jobLog").textContent = lines.slice(-80).join("\n");
+}
+
+function findRecommendationByTicker(ticker) {
+  const normalizedTicker = normalizeTicker(ticker);
+  return [...state.recommendations, ...state.coreRecommendations].find((item) => normalizeTicker(item.ticker) === normalizedTicker);
+}
+
+function normalizeTicker(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits ? digits.slice(-6).padStart(6, "0") : "";
+}
+
+function numberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function techniqueDescription(technique) {

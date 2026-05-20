@@ -1,0 +1,91 @@
+name: Build and deploy KR DayPilot Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 18:37 KST on weekdays, after the regular Korean market session.
+    - cron: "37 9 * * 1-5"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kr-daypilot-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install KR DayPilot
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Write optional data-source secrets
+        run: |
+          cat > .env <<'EOF'
+          OPENDART_API_KEY=${{ secrets.OPENDART_API_KEY }}
+          KRX_ID=${{ secrets.KRX_ID }}
+          KRX_PW=${{ secrets.KRX_PW }}
+          EOF
+
+      - name: Compute KST refresh window
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          today = datetime.now(ZoneInfo("Asia/Seoul")).date()
+          start = today - timedelta(days=430)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
+              handle.write(f"FROM_DATE={start:%Y%m%d}\n")
+              handle.write(f"TO_DATE={today:%Y%m%d}\n")
+          PY
+
+      - name: Refresh recommendation outputs
+        run: |
+          python -m kr_precision_backtest.run_recommender_pipeline \
+            --from-date "$FROM_DATE" \
+            --to-date "$TO_DATE" \
+            --run-date "$TO_DATE" \
+            --price-source auto \
+            --price-max-tickers 250 \
+            --eod-max-tickers 30 \
+            --fundamental-max-tickers 120 \
+            --top 20
+
+      - name: Build static site
+        run: python -m kr_precision_backtest.build_static_site --output site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
