@@ -12,6 +12,7 @@ on:
       - "data/eod_context/**"
       - "data/fundamentals/**"
       - "data/deploy_tickers.csv"
+      - "data/deploy_price_history.csv"
       - "data/kr_universe.csv"
       - "pyproject.toml"
   schedule:
@@ -54,15 +55,25 @@ jobs:
           KRX_PW=${{ secrets.KRX_PW }}
           EOF
 
+      - name: Seed deployment price history
+        run: cp data/deploy_price_history.csv data/kr_stock_price_history.csv
+
       - name: Compute KST refresh window
         run: |
           python - <<'PY'
           import os
           from datetime import datetime, timedelta
           from zoneinfo import ZoneInfo
+          import pandas as pd
 
           today = datetime.now(ZoneInfo("Asia/Seoul")).date()
-          start = today - timedelta(days=430)
+          history = pd.read_csv("data/kr_stock_price_history.csv", dtype={"source_bas_dt": str}, usecols=["source_bas_dt"])
+          latest = pd.to_datetime(history["source_bas_dt"].astype(str).str[:8], format="%Y%m%d", errors="coerce").max()
+          if pd.isna(latest):
+              start = today - timedelta(days=430)
+          else:
+              latest_day = latest.date()
+              start = today if latest_day >= today else latest_day + timedelta(days=1)
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as handle:
               handle.write(f"FROM_DATE={start:%Y%m%d}\n")
               handle.write(f"TO_DATE={today:%Y%m%d}\n")
